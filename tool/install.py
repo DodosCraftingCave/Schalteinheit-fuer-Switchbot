@@ -24,6 +24,23 @@ except ImportError:
 SYSTEM   = platform.system()   # "Windows" oder "Linux"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 
+# Änderung: Wenn install.py bereits als PyInstaller-Binary läuft (frozen),
+# zeigt sys.executable auf die eingefrorene Umgebung, NICHT auf ein echtes
+# Python. Für pip/PyInstaller-Aufrufe brauchen wir ein echtes System-Python.
+def find_system_python():
+    """Findet ein echtes System-Python, auch wenn dieses Skript selbst
+    als PyInstaller-Binary läuft (sys.frozen)."""
+    if not getattr(sys, "frozen", False):
+        return sys.executable
+    candidates = ["python3", "python"] if SYSTEM != "Windows" else ["python", "py"]
+    for cand in candidates:
+        found = shutil.which(cand)
+        if found:
+            return found
+    return None
+
+PYTHON_BIN = find_system_python()
+
 # Installationspfade je System
 if SYSTEM == "Windows":
     INSTALL_DIR  = os.path.join(os.environ.get("ProgramFiles","C:\\Programme"),
@@ -151,17 +168,28 @@ class InstallerApp(tk.Tk):
     def _do_install(self):
         steps = 6
 
+        # ── Schritt 0: System-Python prüfen ──
+        if not PYTHON_BIN:
+            self.after(0, self._log,
+                "[FEHLER] Kein System-Python gefunden. Bitte Python3 installieren:", "err")
+            if SYSTEM == "Linux":
+                self.after(0, self._log,
+                    "  sudo apt install python3 python3-pip python3-tk", "err")
+            else:
+                self.after(0, self._log, "  https://python.org", "err")
+            return
+
         # ── Schritt 1: Python-Abhängigkeiten ──
         self.after(0, self._log, "[1/6] Installiere Python-Pakete…")
         if SYSTEM == "Windows":
-            rc, out = self._run([sys.executable, "-m", "pip", "install",
+            rc, out = self._run([PYTHON_BIN, "-m", "pip", "install",
                                  "--quiet", "requests", "pyinstaller"])
         else:
-            rc, out = self._run([sys.executable, "-m", "pip", "install",
+            rc, out = self._run([PYTHON_BIN, "-m", "pip", "install",
                                  "--quiet", "requests", "pyinstaller",
                                  "--break-system-packages"])
             if rc != 0:
-                rc, out = self._run([sys.executable, "-m", "pip", "install",
+                rc, out = self._run([PYTHON_BIN, "-m", "pip", "install",
                                      "--quiet", "requests", "pyinstaller"])
         if rc != 0:
             self.after(0, self._log, f"[FEHLER] pip: {out}", "err")
@@ -187,7 +215,7 @@ class InstallerApp(tk.Tk):
         build_script = os.path.join(work_dir, "switchbot_config.py")
         shutil.copy(py_script, build_script)
 
-        cmd = [sys.executable, "-m", "PyInstaller",
+        cmd = [PYTHON_BIN, "-m", "PyInstaller",
                "--onefile", "--windowed",
                "--name", "SwitchBot-Konfigurator",
                "--distpath", os.path.join(work_dir, "dist"),
