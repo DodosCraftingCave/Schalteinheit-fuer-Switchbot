@@ -22,7 +22,15 @@ except ImportError:
     from tkinter import ttk
 
 SYSTEM   = platform.system()   # "Windows" oder "Linux"
-SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+# Änderung: Bei PyInstaller-Onefile ist sys.argv[0] unzuverlässig für den
+# tatsächlichen Speicherort — sys.executable zeigt zuverlässig auf die
+# laufende Binary. Im Nicht-frozen Fall (normales .py-Skript) bleibt
+# sys.argv[0] korrekt.
+if getattr(sys, "frozen", False):
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 # Änderung: Wenn install.py bereits als PyInstaller-Binary läuft (frozen),
 # zeigt sys.executable auf die eingefrorene Umgebung, NICHT auf ein echtes
@@ -200,11 +208,26 @@ class InstallerApp(tk.Tk):
         # ── Schritt 2: Tool-Script finden ──
         self.after(0, self._log, "[2/6] Suche Tool-Script…")
         import glob
-        scripts = glob.glob(os.path.join(SCRIPT_DIR, "switchbot_config_v*_beta.py"))
+        import re
+        # Änderung: Muster erkennt sowohl "..._beta.py" (aktuell) als auch
+        # spätere Versionen ohne Beta-Suffix, z.B. "switchbot_config_v1.2.py"
+        pattern = os.path.join(SCRIPT_DIR, "switchbot_config_v*.py")
+        scripts = glob.glob(pattern)
         if not scripts:
-            self.after(0, self._log, "[FEHLER] switchbot_config_v*_beta.py nicht gefunden.", "err")
+            self.after(0, self._log,
+                f"[FEHLER] Keine switchbot_config_v*.py gefunden in:\n  {SCRIPT_DIR}", "err")
             return
-        py_script = sorted(scripts)[-1]   # neueste Version nehmen
+
+        def _version_key(path):
+            name = os.path.basename(path)
+            m = re.search(r"v([\d.]+)(_beta)?", name)
+            if not m:
+                return ((0,), 0)
+            nums = tuple(int(x) for x in m.group(1).split("."))
+            is_beta = 0 if m.group(2) else 1
+            return (nums, is_beta)
+
+        py_script = sorted(scripts, key=_version_key)[-1]   # neueste Version
         self.after(0, self._log, f"[OK] {os.path.basename(py_script)}", "ok")
         self.after(0, self._set_progress, 100 // steps * 2)
 
