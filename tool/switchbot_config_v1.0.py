@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 SwitchBot Konfigurator
-Version: 1.0.0
-GitHub:  https://github.com/DEIN-USERNAME/switchbot-konfigurator
+Version: 1.0
+GitHub:  https://github.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot
 """
 
 import tkinter as tk
@@ -187,16 +187,21 @@ def validate_firmware_binary(data):
 #  AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════
 def parse_version(v):
-    """Wandelt Versionsstrings wie '1.0' oder '0.8_beta' in ein Tuple zum Vergleichen um."""
+    """Wandelt Versionsstrings wie '1.0' oder '0.8_beta' in ein Tuple zum Vergleichen um.
+    Änderung: Zahlenteile werden auf eine feste Länge aufgefüllt (mit Nullen),
+    damit z.B. '1.0' und '1.0.0' korrekt als GLEICHWERTIG erkannt werden.
+    Vorher wurde eine kürzere Zahlenfolge durch reinen Tuple-Längen-Vergleich
+    fälschlich als 'kleiner' gewertet, selbst wenn die Version identisch war."""
     v = v.strip().lstrip("v")
-    # beta < release: beta bekommt extra -1
     is_beta = "_beta" in v
     nums = v.replace("_beta","").replace("-beta","")
     try:
         parts = [int(x) for x in nums.split(".")]
     except ValueError:
         parts = [0]
-    return (parts, 0 if is_beta else 1)
+    while len(parts) < 4:
+        parts.append(0)
+    return (parts[:4], 0 if is_beta else 1)
 
 def github_list(path):
     """Listet Dateien in einem GitHub-Ordner per API."""
@@ -211,7 +216,10 @@ def check_tool_update():
     Gibt (neue_version, download_url) zurück oder (None, None).
     """
     try:
-        files = github_list("")
+        # Änderung: Datei liegt im tool/-Unterordner, nicht im Repo-Root —
+        # vorher wurde immer im Root gesucht und nie etwas gefunden, seit
+        # die Struktur auf tool/ + firmware/ umgestellt wurde.
+        files = github_list("tool")
         candidates = []
         for f in files:
             name = f["name"]
@@ -251,7 +259,7 @@ def check_firmware_update():
     except Exception:
         return None, None
 
-def do_tool_self_update(new_version):
+def do_tool_self_update(app, new_version):
     """
     Lädt die fertig gebaute App-Binary von GitHub herunter (gebaut von
     GitHub Actions) und ersetzt die aktuell laufende Datei.
@@ -261,12 +269,17 @@ def do_tool_self_update(new_version):
     Im Quellcode-Betrieb (python3 switchbot_config_v...py, nicht als
     Binary gebaut) wird nur eine Info-Meldung angezeigt, da es dort
     keine "laufende Binary" zum Ersetzen gibt.
+
+    Änderung: Nimmt jetzt eine App-Referenz entgegen, damit alle
+    messagebox-Aufrufe über app.after() sicher auf dem Main-Thread
+    laufen — vorher wurden sie direkt aus dem Update-Hintergrundthread
+    aufgerufen, was bei Tkinter zu Freezes/Abstürzen führen kann.
     """
     if not getattr(sys, "frozen", False):
-        messagebox.showinfo("Update verfügbar",
+        app.after(0, lambda: messagebox.showinfo("Update verfügbar",
             f"Neue Version v{new_version} verfügbar.\n\n"
             f"Das Tool läuft gerade aus dem Quellcode (nicht als Programm).\n"
-            f"Bitte die neue Version manuell von GitHub laden.")
+            f"Bitte die neue Version manuell von GitHub laden."))
         return
 
     try:
@@ -303,7 +316,8 @@ del "%~f0"
             os.replace(tmp_path, exe_path)
             os.execv(exe_path, [exe_path])
     except Exception as e:
-        messagebox.showerror("Update-Fehler", str(e))
+        err = str(e)
+        app.after(0, lambda: messagebox.showerror("Update-Fehler", err))
 
 
 # ════════════════════════════════════════════════════════════════
@@ -528,14 +542,22 @@ class App(tk.Tk):
     def _startup_checks(self):
         """Läuft beim Start: Tool-Update + ESP-Discovery + FW-Check."""
         # 1. Tool-Update prüfen
+        # Änderung: messagebox.askyesno lief vorher direkt in diesem
+        # Hintergrund-Thread — Tkinter-Dialoge dürfen nur vom Main-Thread
+        # aus aufgerufen werden. Jetzt über self.after() sicher verschoben;
+        # der eigentliche Download läuft bei Bestätigung in einem weiteren
+        # Thread, damit die Oberfläche währenddessen nicht einfriert.
         try:
             new_ver, dl_url = check_tool_update()
             if new_ver:
-                ans = messagebox.askyesno("Tool-Update verfügbar",
-                    f"Neue Version v{new_ver} verfügbar (aktuell v{VERSION}).\n"
-                    f"Jetzt automatisch updaten?")
-                if ans:
-                    do_tool_self_update(new_ver)
+                def _prompt_tool_update():
+                    ans = messagebox.askyesno("Tool-Update verfügbar",
+                        f"Neue Version v{new_ver} verfügbar (aktuell v{VERSION}).\n"
+                        f"Jetzt automatisch updaten?")
+                    if ans:
+                        threading.Thread(target=do_tool_self_update,
+                                          args=(self, new_ver), daemon=True).start()
+                self.after(0, _prompt_tool_update)
         except Exception:
             pass
 
@@ -740,7 +762,8 @@ class App(tk.Tk):
         ip = self.esp_ip.get().strip()
         if not ip:
             messagebox.showerror("Fehler",
-                "ESP32 nicht gefunden.\nBitte per USB anschließen und IP eintragen.")
+                "ESP32 nicht gefunden.\nBitte 'Suchen' klicken oder IP manuell "
+                "eintragen — der ESP32 muss im gleichen Netzwerk erreichbar sein.")
             return
         if not messagebox.askyesno("Firmware-Update",
                 f"ESP32 Firmware v{self.fw_update} von GitHub flashen?\n"

@@ -8,6 +8,7 @@ on:
       - 'tool/install.py'
       - 'tool/uninstall.py'
       - '.github/workflows/build.yml'
+  workflow_dispatch: {}   # erlaubt manuellen Start über den "Run workflow"-Button auf GitHub
 
 jobs:
   # ── 1. Die eigentliche App bauen (Windows) ───────────────────────

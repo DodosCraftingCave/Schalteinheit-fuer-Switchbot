@@ -45,7 +45,7 @@ class InstallerApp(tk.Tk):
         super().__init__()
         self.title("SwitchBot Konfigurator – Installation")
         self.resizable(False, False)
-        self.configure(bg="#1e1e2e")
+        self.configure(bg="#00688B")
         self.geometry("480x340")
         self._center()
         self._build()
@@ -58,15 +58,15 @@ class InstallerApp(tk.Tk):
         self.geometry(f"{w}x{h}+{x}+{y}")
 
     def _build(self):
-        BG, PANEL, ACCENT = "#1e1e2e", "#2a2a3e", "#7c6af7"
-        TEXT, MUTED, GREEN = "#e0e0f0", "#888aaa", "#3dd68c"
+        BG, PANEL, ACCENT = "#00688B", "#005575", "#E63946"
+        TEXT, MUTED, GREEN = "#FFFFFF", "#CFE8F0", "#2ECC71"
 
         hdr = tk.Frame(self, bg=ACCENT, pady=14)
         hdr.pack(fill="x")
         tk.Label(hdr, text="SwitchBot Konfigurator",
                  font=("Segoe UI",16,"bold"), bg=ACCENT, fg="white").pack()
         tk.Label(hdr, text="Installation", font=("Segoe UI",10),
-                 bg=ACCENT, fg="#d0ccff").pack()
+                 bg=ACCENT, fg="#FFE0E0").pack()
 
         info = tk.Frame(self, bg=PANEL, pady=12)
         info.pack(fill="x", padx=16, pady=(14,6))
@@ -74,18 +74,18 @@ class InstallerApp(tk.Tk):
                  bg=PANEL, fg=MUTED, font=("Segoe UI",9),
                  justify="left").pack(padx=12)
 
-        self.log = tk.Text(self, bg="#12121f", fg=TEXT,
+        self.log = tk.Text(self, bg="#004358", fg=TEXT,
                            font=("Consolas",9), relief="flat",
                            state="disabled", height=7)
         self.log.pack(fill="both", expand=True, padx=16, pady=6)
         self.log.tag_config("ok", foreground=GREEN)
-        self.log.tag_config("err", foreground="#ff6b6b")
+        self.log.tag_config("err", foreground="#FF6B6B")
 
         style = ttk.Style(self)
         style.theme_use("clam")
         style.configure("green.Horizontal.TProgressbar",
-                        troughcolor="#12121f", background=GREEN,
-                        bordercolor="#12121f", lightcolor=GREEN, darkcolor=GREEN)
+                        troughcolor="#004358", background=GREEN,
+                        bordercolor="#004358", lightcolor=GREEN, darkcolor=GREEN)
         self.progress = ttk.Progressbar(self, style="green.Horizontal.TProgressbar",
                                         length=448, mode="determinate")
         self.progress.pack(padx=16, pady=(0,6))
@@ -95,7 +95,7 @@ class InstallerApp(tk.Tk):
 
         self.install_btn = tk.Button(btn_frm, text="🚀  Jetzt installieren",
             command=self._start, bg=ACCENT, fg="white",
-            activebackground="#5a4dd4", font=("Segoe UI",11,"bold"),
+            activebackground="#C5303C", font=("Segoe UI",11,"bold"),
             relief="flat", cursor="hand2", pady=9)
         self.install_btn.pack(fill="x")
 
@@ -151,12 +151,26 @@ class InstallerApp(tk.Tk):
                         if total:
                             pct = 15 + int(60 * downloaded / total)
                             self.after(0, self._set_progress, pct)
+        except PermissionError:
+            # Änderung: klare Meldung wenn die Zieldatei gesperrt ist, z.B.
+            # weil eine ältere Version der App gerade läuft (Windows kann
+            # laufende .exe-Dateien nicht überschreiben).
+            self.after(0, self._log,
+                "[FEHLER] Datei ist gesperrt. Läuft SwitchBot Konfigurator "
+                "bereits? Bitte schließen und erneut versuchen.", "err")
+            return
         except Exception as ex:
             self.after(0, self._log, f"[FEHLER] Download fehlgeschlagen: {ex}", "err")
             return
 
-        if not os.path.exists(APP_DEST) or os.path.getsize(APP_DEST) < 1000:
-            self.after(0, self._log, "[FEHLER] Heruntergeladene Datei ist ungültig.", "err")
+        # Änderung: Schwelle von 1000 Bytes auf 1MB angehoben — die echte App
+        # ist ~25MB groß; eine GitHub-404-Seite wäre größer als 1000 Bytes
+        # und wäre vorher fälschlich als "gültig" durchgerutscht.
+        MIN_VALID_SIZE = 1_000_000
+        if not os.path.exists(APP_DEST) or os.path.getsize(APP_DEST) < MIN_VALID_SIZE:
+            self.after(0, self._log,
+                f"[FEHLER] Heruntergeladene Datei ist zu klein oder ungültig "
+                f"({os.path.getsize(APP_DEST) if os.path.exists(APP_DEST) else 0} Bytes).", "err")
             return
 
         if SYSTEM == "Linux":
@@ -203,7 +217,7 @@ Categories=Utility;
 
     def _finish(self):
         self.install_btn.config(text="✅  Installation erfolgreich!",
-                                bg="#2a4a2a", fg="#3dd68c")
+                                bg="#1B5E42", fg="#2ECC71")
         self.close_btn.pack(fill="x", pady=(4,0))
         if SYSTEM == "Windows":
             os.startfile(APP_DEST)
