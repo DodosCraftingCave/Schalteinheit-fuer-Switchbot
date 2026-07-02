@@ -9,12 +9,12 @@ GitHub:  https://github.com/DEIN-USERNAME/switchbot-konfigurator
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json, os, sys, threading, time, hmac, hashlib, base64, uuid
-import urllib.request, urllib.error, socket, subprocess, tempfile
+import urllib.request, urllib.error, socket, subprocess
 
 # ════════════════════════════════════════════════════════════════
 #  KONSTANTEN
 # ════════════════════════════════════════════════════════════════
-VERSION          = "0.8_beta"
+VERSION          = "1.0"
 GITHUB_RAW       = "https://raw.githubusercontent.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/main"
 GITHUB_API       = "https://api.github.com/repos/DodosCraftingCave/Schalteinheit-fuer-Switchbot/contents"
 MDNS_HOST        = "controller-for-switchbot.local"
@@ -161,19 +161,33 @@ def esp_upload_config(ip, config_dict):
     r = requests.post(f"http://{ip}/upload", files=files, timeout=15)
     return r.text
 
-def esp_flash_firmware(ip, bin_data, progress_cb=None):
-    """Flasht firmware.bin per HTTP OTA auf den ESP."""
+def esp_flash_firmware(ip, bin_data):
+    """Flasht firmware.bin per HTTP OTA auf den ESP.
+    Änderung: Timeout von 120s auf 300s erhöht (kann bei langsamem WLAN
+    knapp werden), Aufruf-Signatur bereinigt (progress_cb wurde nie
+    genutzt)."""
     import requests
     files = {"data": ("firmware.bin", bin_data, "application/octet-stream")}
-    r = requests.post(f"http://{ip}/ota", files=files, timeout=120)
+    r = requests.post(f"http://{ip}/ota", files=files, timeout=300)
     return r.text
+
+def validate_firmware_binary(data):
+    """Prüft ob die heruntergeladene Datei plausibel eine gültige
+    ESP32-Firmware ist, bevor geflasht wird. Verhindert dass z.B. eine
+    GitHub-404-HTML-Seite versehentlich als 'Firmware' geflasht wird.
+    Gültige ESP32-Firmware-Images beginnen mit dem Magic-Byte 0xE9."""
+    if len(data) < 100_000:
+        return False, f"Datei zu klein ({len(data)} Bytes) – keine gültige Firmware."
+    if data[0] != 0xE9:
+        return False, "Datei beginnt nicht mit dem ESP32-Firmware-Magic-Byte (0xE9)."
+    return True, ""
 
 
 # ════════════════════════════════════════════════════════════════
 #  AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════
 def parse_version(v):
-    """Wandelt '0.8_beta' oder '1.2' in Tuple zum Vergleichen um."""
+    """Wandelt Versionsstrings wie '1.0' oder '0.8_beta' in ein Tuple zum Vergleichen um."""
     v = v.strip().lstrip("v")
     # beta < release: beta bekommt extra -1
     is_beta = "_beta" in v
@@ -193,7 +207,7 @@ def github_list(path):
 
 def check_tool_update():
     """
-    Sucht neueste switchbot_config_v*_beta.py auf GitHub.
+    Sucht neueste switchbot_config_v*.py auf GitHub (mit oder ohne _beta-Suffix).
     Gibt (neue_version, download_url) zurück oder (None, None).
     """
     try:
@@ -217,7 +231,7 @@ def check_tool_update():
 
 def check_firmware_update():
     """
-    Sucht neueste firmware_v*_beta.bin im firmware/-Ordner auf GitHub.
+    Sucht neueste firmware_v*.bin im firmware/-Ordner auf GitHub (mit oder ohne _beta-Suffix).
     Gibt (neue_version, download_url) zurück oder (None, None).
     """
     try:
@@ -300,7 +314,7 @@ class App(tk.Tk):
         super().__init__()
         self.title(f"SwitchBot Konfigurator  v{VERSION}")
         self.resizable(False, False)
-        self.configure(bg="#1e1e2e")
+        self.configure(bg="#00688B")
 
         self.all_items   = []
         self.dev_cbs     = []
@@ -308,6 +322,7 @@ class App(tk.Tk):
         self.dev_vars    = []
         self.cmd_vars    = []
         self.esp_ip      = tk.StringVar(value="")
+        self.esp_current_fw = None  # tatsächlich installierte ESP-Firmware-Version (aus /status)
         self.fw_update     = None   # neue FW-Version falls verfügbar
         self.fw_update_url = None   # Download-URL der neuen Firmware
 
@@ -318,15 +333,15 @@ class App(tk.Tk):
 
     # ── UI-Aufbau ────────────────────────────────────────────────
     def _build(self):
-        BG     = "#1e1e2e"
-        PANEL  = "#2a2a3e"
-        ACCENT = "#7c6af7"
-        TEXT   = "#e0e0f0"
-        MUTED  = "#888aaa"
-        INPUT  = "#12121f"
-        GREEN  = "#3dd68c"
-        ORANGE = "#f0a500"
-        BORDER = "#3a3a55"
+        BG     = "#00688B"
+        PANEL  = "#005575"
+        ACCENT = "#E63946"
+        TEXT   = "#FFFFFF"
+        MUTED  = "#CFE8F0"
+        INPUT  = "#004358"
+        GREEN  = "#2ECC71"
+        ORANGE = "#F4A300"
+        BORDER = "#2E86AB"
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -342,16 +357,16 @@ class App(tk.Tk):
         tk.Label(hdr, text="SwitchBot Konfigurator",
                  font=("Segoe UI",15,"bold"), bg=ACCENT, fg="white").pack()
         tk.Label(hdr, text=f"v{VERSION}  ·  ESP32 14-Taster-Matrix",
-                 font=("Segoe UI",9), bg=ACCENT, fg="#d0ccff").pack()
+                 font=("Segoe UI",9), bg=ACCENT, fg="#FFE0E0").pack()
 
         # ── Firmware-Update Banner (initial versteckt) ──
         self.fw_banner = tk.Frame(self, bg=ORANGE, pady=6)
         self.fw_banner_lbl = tk.Label(self.fw_banner,
-            text="", bg=ORANGE, fg="#1a0a00",
+            text="", bg=ORANGE, fg="#3D2400",
             font=("Segoe UI",9,"bold"))
         self.fw_banner_lbl.pack(side="left", padx=12)
         self.fw_flash_btn = tk.Button(self.fw_banner,
-            text="🔄 Jetzt flashen", bg="#c07800", fg="white",
+            text="🔄 Jetzt flashen", bg="#C27C00", fg="white",
             font=("Segoe UI",9,"bold"), relief="flat", cursor="hand2",
             command=self._flash_firmware)
         self.fw_flash_btn.pack(side="right", padx=12)
@@ -409,13 +424,13 @@ class App(tk.Tk):
 
         self.scan_btn = tk.Button(btn_row, text="🔍  SwitchBot Geräte laden",
             command=self._load,
-            bg=ACCENT, fg="white", activebackground="#5a4dd4",
+            bg=ACCENT, fg="white", activebackground="#C5303C",
             font=("Segoe UI",10,"bold"), relief="flat", cursor="hand2", pady=7)
         self.scan_btn.pack(side="left", fill="x", expand=True, padx=(0,4))
 
         self.upload_btn = tk.Button(btn_row, text="⬆  Direkt auf ESP laden",
             command=self._upload_to_esp,
-            bg="#2a5a2a", fg=GREEN, activebackground="#3a7a3a",
+            bg="#1F6B4C", fg=GREEN, activebackground="#27AE60",
             font=("Segoe UI",10,"bold"), relief="flat", cursor="hand2", pady=7)
         self.upload_btn.pack(side="left", fill="x", expand=True, padx=(4,0))
 
@@ -451,7 +466,7 @@ class App(tk.Tk):
 
         # 14 Zeilen
         for i, pin in enumerate(PINS):
-            row_bg = PANEL if i % 2 == 0 else "#252538"
+            row_bg = PANEL if i % 2 == 0 else "#004964"
             r = i + 1
             tk.Label(tbl, text=f"Taster {i+1}",
                      bg=row_bg, fg=TEXT,
@@ -496,13 +511,13 @@ class App(tk.Tk):
 
         tk.Button(save_row, text="💾  config.json auf Desktop speichern",
             command=self._save,
-            bg=GREEN, fg="#0a1a10", activebackground="#2ab870",
+            bg=GREEN, fg="#04140A", activebackground="#27AE60",
             font=("Segoe UI",10,"bold"), relief="flat",
             cursor="hand2", pady=8).pack(side="left", fill="x", expand=True, padx=(0,4))
 
         tk.Button(save_row, text="💾 + ⬆  Speichern & direkt hochladen",
             command=self._save_and_upload,
-            bg="#1a3a2a", fg=GREEN,
+            bg="#1B5E42", fg=GREEN,
             font=("Segoe UI",10,"bold"), relief="flat",
             cursor="hand2", pady=8).pack(side="left", fill="x", expand=True, padx=(4,0))
 
@@ -524,43 +539,71 @@ class App(tk.Tk):
         except Exception:
             pass
 
-        # 2. ESP32 suchen
+        # 2. ESP32 suchen (setzt dabei self.esp_current_fw)
         self._discover_esp()
 
-        # 3. Firmware-Update prüfen
+        # 3. Firmware-Update prüfen — Änderung: nur anzeigen wenn die
+        # GitHub-Version tatsächlich neuer ist als die auf dem ESP
+        # installierte Version (vorher wurde der Banner immer gezeigt,
+        # sobald irgendeine Firmware im Repo lag, unabhängig vom
+        # tatsächlichen Stand des Geräts).
         try:
             fw_ver, fw_url = check_firmware_update()
-            if fw_ver:
+            if fw_ver and self.esp_current_fw:
+                if parse_version(fw_ver) > parse_version(self.esp_current_fw):
+                    self.fw_update = fw_ver
+                    self.fw_update_url = fw_url
+                    self.after(0, self._show_fw_banner, fw_ver)
+            elif fw_ver and not self.esp_current_fw:
+                # ESP nicht gefunden -> können nicht sicher vergleichen,
+                # trotzdem informieren aber vorsichtiger formuliert
                 self.fw_update = fw_ver
                 self.fw_update_url = fw_url
-                self.after(0, self._show_fw_banner, fw_ver)
+                self.after(0, self._show_fw_banner, fw_ver, True)
         except Exception:
             pass
 
     def _discover_esp(self):
-        """Sucht ESP32 per mDNS, setzt IP ins Feld."""
+        """Sucht ESP32 per mDNS, setzt IP ins Feld und merkt sich die
+        installierte Firmware-Version für den Update-Vergleich."""
         self.after(0, lambda: self.esp_status_lbl.config(
-            text="⏳ Suche ESP32…", fg="#888aaa"))
-        ip = resolve_esp_ip()
+            text="⏳ Suche ESP32…", fg="#CFE8F0"))
+        # Änderung: Timeout für mDNS-Auflösung setzen, sonst kann das unter
+        # Windows ohne Bonjour/mDNS-Unterstützung sehr lange hängen bleiben.
+        old_timeout = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(4)
+        try:
+            ip = resolve_esp_ip()
+        finally:
+            socket.setdefaulttimeout(old_timeout)
         if not ip:
             # Fallback: direkt per IP aus Feld versuchen
             ip = self.esp_ip.get().strip()
         if ip:
             status = esp_get_status(ip)
             if status:
+                self.esp_current_fw = status.get("fw")
                 self.after(0, lambda: self.esp_ip.set(ip))
                 self.after(0, lambda: self.esp_status_lbl.config(
                     text=f"✅ Gefunden · {status.get('buttons',0)}/14 Taster · "
                          f"FW v{status.get('fw','?')}",
-                    fg="#3dd68c"))
+                    fg="#2ECC71"))
                 return
         self.after(0, lambda: self.esp_status_lbl.config(
-            text="❌ Nicht gefunden – IP manuell eintragen", fg="#ff6b6b"))
+            text="❌ Nicht gefunden – IP manuell eintragen", fg="#FF6B6B"))
 
-    def _show_fw_banner(self, fw_ver):
-        """Zeigt den Firmware-Update-Banner an."""
-        self.fw_banner_lbl.config(
-            text=f"⚠  Neue ESP32-Firmware v{fw_ver} verfügbar – ESP32 per USB anschließen")
+    def _show_fw_banner(self, fw_ver, unknown_current=False):
+        """Zeigt den Firmware-Update-Banner an.
+        Änderung: Text korrigiert — der Flash läuft über WLAN (HTTP OTA
+        an die ESP32-IP), nicht per USB. Der alte Text war schlicht falsch
+        und hätte Kunden unnötig verwirrt."""
+        if unknown_current:
+            text = (f"⚠  Firmware v{fw_ver} verfügbar – ESP32 muss im "
+                    f"Netzwerk erreichbar sein zum Prüfen/Flashen")
+        else:
+            text = (f"⚠  Neue ESP32-Firmware v{fw_ver} verfügbar "
+                    f"(aktuell v{self.esp_current_fw}) – bereit zum Flashen")
+        self.fw_banner_lbl.config(text=text)
         self.fw_banner.pack(fill="x", after=self.children.get("!frame"))
 
     # ── Geräte laden ─────────────────────────────────────────────
@@ -713,6 +756,15 @@ class App(tk.Tk):
             req = urllib.request.Request(url, headers={"User-Agent":"SwitchBot-Tool"})
             with urllib.request.urlopen(req, timeout=30) as r:
                 bin_data = r.read()
+
+            # Änderung: Sicherheitscheck vor dem Flash — verhindert dass eine
+            # fehlerhaft heruntergeladene Datei (z.B. GitHub-404-Seite statt
+            # echter .bin) den ESP32 in einen unbrauchbaren Zustand bringt.
+            valid, reason = validate_firmware_binary(bin_data)
+            if not valid:
+                self.after(0, lambda: messagebox.showerror(
+                    "Ungültige Firmware", f"Flash abgebrochen: {reason}"))
+                return
 
             self.after(0, lambda: self.fw_flash_btn.config(text="⏳ Flashe ESP32…"))
             result = esp_flash_firmware(ip, bin_data)

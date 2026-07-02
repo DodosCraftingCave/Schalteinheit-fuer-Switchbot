@@ -36,7 +36,7 @@ class UninstallerApp(tk.Tk):
         super().__init__()
         self.title("SwitchBot Konfigurator – Deinstallation")
         self.resizable(False, False)
-        self.configure(bg="#1e1e2e")
+        self.configure(bg="#00688B")
         self.geometry("460x280")
         self._center()
         self._build()
@@ -49,18 +49,18 @@ class UninstallerApp(tk.Tk):
         self.geometry(f"{w}x{h}+{x}+{y}")
 
     def _build(self):
-        BG    = "#1e1e2e"
-        PANEL = "#2a2a3e"
-        MUTED = "#888aaa"
-        TEXT  = "#e0e0f0"
-        RED   = "#ff6b6b"
+        BG    = "#00688B"
+        PANEL = "#005575"
+        MUTED = "#CFE8F0"
+        TEXT  = "#FFFFFF"
+        RED   = "#FF6B6B"
 
-        hdr = tk.Frame(self, bg="#c0392b", pady=14)
+        hdr = tk.Frame(self, bg="#E63946", pady=14)
         hdr.pack(fill="x")
         tk.Label(hdr, text="SwitchBot Konfigurator",
-                 font=("Segoe UI",15,"bold"), bg="#c0392b", fg="white").pack()
+                 font=("Segoe UI",15,"bold"), bg="#E63946", fg="white").pack()
         tk.Label(hdr, text="Deinstallation",
-                 font=("Segoe UI",10), bg="#c0392b", fg="#ffc0c0").pack()
+                 font=("Segoe UI",10), bg="#E63946", fg="#FFE0E0").pack()
 
         info = tk.Frame(self, bg=PANEL, pady=10)
         info.pack(fill="x", padx=16, pady=(12,6))
@@ -71,11 +71,11 @@ class UninstallerApp(tk.Tk):
                  bg=PANEL, fg=MUTED, font=("Segoe UI",9),
                  justify="left").pack(padx=12)
 
-        self.log = tk.Text(self, bg="#12121f", fg=TEXT,
+        self.log = tk.Text(self, bg="#004358", fg=TEXT,
                            font=("Consolas",9), relief="flat",
                            state="disabled", height=4)
         self.log.pack(fill="x", padx=16, pady=4)
-        self.log.tag_config("ok",  foreground="#3dd68c")
+        self.log.tag_config("ok",  foreground="#2ECC71")
         self.log.tag_config("err", foreground=RED)
 
         btn_frm = tk.Frame(self, bg=BG)
@@ -84,7 +84,7 @@ class UninstallerApp(tk.Tk):
         self.uninstall_btn = tk.Button(btn_frm,
             text="🗑  Jetzt deinstallieren",
             command=self._confirm,
-            bg="#c0392b", fg="white",
+            bg="#E63946", fg="white",
             font=("Segoe UI",11,"bold"), relief="flat",
             cursor="hand2", pady=9)
         self.uninstall_btn.pack(fill="x")
@@ -126,7 +126,7 @@ class UninstallerApp(tk.Tk):
                    {"text": "✅  Fertig – Fenster schließen",
                     "command": self.destroy,
                     "state": "normal",
-                    "bg": "#2a4a2a"})
+                    "bg": "#1B5E42"})
 
 
 if __name__ == "__main__":
