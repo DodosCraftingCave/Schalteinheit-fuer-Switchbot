@@ -20,10 +20,13 @@ except ImportError:
 
 SYSTEM = platform.system()
 
+# Änderung: Muss zum neuen Installationsort in install.py passen
+# (%LOCALAPPDATA% statt %ProgramFiles%, kein Admin-Recht mehr nötig).
 if SYSTEM == "Windows":
-    INSTALL_DIR = os.path.join(os.environ.get("ProgramFiles","C:\\Programme"),
+    INSTALL_DIR = os.path.join(os.environ.get("LOCALAPPDATA",
+                               os.path.expanduser("~\\AppData\\Local")),
                                "SwitchBot-Konfigurator")
-    DESKTOP     = os.path.join(os.environ.get("PUBLIC","C:\\Users\\Public"), "Desktop")
+    DESKTOP     = os.path.join(os.path.expanduser("~"), "Desktop")
     SHORTCUT    = os.path.join(DESKTOP, "SwitchBot Konfigurator.lnk")
 else:
     INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".local", "share", "SwitchBot-Konfigurator")
@@ -130,11 +133,6 @@ class UninstallerApp(tk.Tk):
 
 
 if __name__ == "__main__":
-    if SYSTEM == "Windows":
-        import ctypes
-        if not ctypes.windll.shell32.IsUserAnAdmin():
-            ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-            sys.exit(0)
-
+    # Änderung: Keine UAC-Elevation mehr nötig — Installationsort ist
+    # %LOCALAPPDATA% (gehört dem aktuellen Nutzer), nicht mehr %ProgramFiles%.
     UninstallerApp().mainloop()

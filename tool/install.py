@@ -26,11 +26,19 @@ SYSTEM = platform.system()   # "Windows" oder "Linux"
 
 GITHUB_RAW = "https://raw.githubusercontent.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/main"
 
+# Änderung: Windows installiert jetzt nach %LOCALAPPDATA% statt
+# %ProgramFiles%. Programme-Ordner braucht Admin-Rechte zum Schreiben —
+# der Installer lief zwar elevated (UAC), aber das spätere Auto-Update
+# (ausgelöst vom laufenden Tool als normaler Nutzer) konnte dort nicht
+# mehr selbst schreiben → PermissionError (Errno 13). %LOCALAPPDATA%
+# gehört immer dem aktuellen Nutzer, nie Admin-Rechte nötig — weder für
+# Installation noch für spätere Selbst-Updates.
 if SYSTEM == "Windows":
     APP_NAME    = "SwitchBot-Konfigurator.exe"
-    INSTALL_DIR = os.path.join(os.environ.get("ProgramFiles", "C:\\Programme"),
+    INSTALL_DIR = os.path.join(os.environ.get("LOCALAPPDATA",
+                               os.path.expanduser("~\\AppData\\Local")),
                                "SwitchBot-Konfigurator")
-    DESKTOP     = os.path.join(os.environ.get("PUBLIC", "C:\\Users\\Public"), "Desktop")
+    DESKTOP     = os.path.join(os.path.expanduser("~"), "Desktop")
 else:
     APP_NAME    = "SwitchBot-Konfigurator"
     INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".local", "share", "SwitchBot-Konfigurator")
@@ -226,11 +234,6 @@ Categories=Utility;
 
 
 if __name__ == "__main__":
-    if SYSTEM == "Windows":
-        import ctypes
-        if not ctypes.windll.shell32.IsUserAnAdmin():
-            ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-            sys.exit(0)
-
+    # Änderung: Keine UAC-Elevation mehr nötig — Installationsort ist jetzt
+    # %LOCALAPPDATA% (gehört dem aktuellen Nutzer), nicht mehr %ProgramFiles%.
     InstallerApp().mainloop()
