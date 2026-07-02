@@ -25,7 +25,7 @@ Kein Python, keine weiteren Programme nötig — alles ist in der Datei enthalte
 ```
 Schalteinheit-fuer-Switchbot/
 ├── tool/
-│   ├── switchbot_config_v1.0.py     ← Quellcode des Tools
+│   ├── switchbot_config_v1.1.py     ← Quellcode des Tools
 │   ├── SwitchBot-Konfigurator.exe   ← fertig gebaute App (Windows, automatisch)
 │   ├── SwitchBot-Konfigurator       ← fertig gebaute App (Linux, automatisch)
 │   ├── install.py                   ← Installer-Quellcode
@@ -35,13 +35,13 @@ Schalteinheit-fuer-Switchbot/
 │   ├── uninstall_windows.exe        ← (automatisch)
 │   └── uninstall_linux              ← (automatisch)
 ├── firmware/
-│   └── firmware_v1.0.bin            ← NUR die kompilierte Binary
+│   └── firmware_v1.1.bin            ← NUR die kompilierte Binary
 └── .github/workflows/build.yml      ← baut App + Installer automatisch
 ```
 
 **Wichtig:** Der ESP32-Firmware-Quellcode (`main.cpp`, `platformio.ini`) bleibt
 **ausschließlich lokal** und wird niemals auf GitHub gepusht — das Projekt ist
-nicht Open Source. Nur die fertig kompilierte `firmware_v1.0.bin` wird
+nicht Open Source. Nur die fertig kompilierte `firmware_v1.1.bin` wird
 veröffentlicht, damit das Tool sie herunterladen und per OTA flashen kann.
 Ein `.gitignore` verhindert versehentliches Hinzufügen dieser Dateien.
 
@@ -53,7 +53,7 @@ neu gebaut und ins Repo committet — nichts davon muss manuell hochgeladen werd
 
 ## Workflow für neue Tool-Versionen (Entwickler)
 
-1. `switchbot_config_v1.0.py` kopieren → `switchbot_config_v1.1.py`
+1. `switchbot_config_v1.1.py` kopieren → `switchbot_config_v1.2.py`
 2. `VERSION = "1.1"` im neuen File setzen
 3. Alte Versionsdatei aus dem Repo löschen (optional, hält es sauber)
 4. Neue Datei nach `tool/` pushen
@@ -66,9 +66,9 @@ neu gebaut und ins Repo committet — nichts davon muss manuell hochgeladen werd
 
 ## Workflow für neue ESP32-Firmware (Entwickler)
 
-1. `main.cpp` (lokal, nicht im Repo) ändern, `FW_VERSION` erhöhen (z.B. `"1.1"`)
+1. `main.cpp` (lokal, nicht im Repo) ändern, `FW_VERSION` erhöhen (z.B. `"1.2"`)
 2. PlatformIO lokal: `pio run` → `.pio/build/esp32dev/firmware.bin`
-3. Umbenennen zu `firmware_v1.1.bin` (Muster: `firmware_v*.bin` ist Pflicht,
+3. Umbenennen zu `firmware_v1.2.bin` (Muster: `firmware_v*.bin` ist Pflicht,
    sonst erkennt das Tool die Datei nicht)
 4. Nur diese `.bin`-Datei nach `firmware/` im Repo hochladen (alte Version
    kann bleiben oder gelöscht werden) — main.cpp/platformio.ini NIEMALS mit hochladen

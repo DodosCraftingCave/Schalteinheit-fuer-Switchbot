@@ -14,7 +14,7 @@ import urllib.request, urllib.error, socket, subprocess
 # ════════════════════════════════════════════════════════════════
 #  KONSTANTEN
 # ════════════════════════════════════════════════════════════════
-VERSION          = "1.0"
+VERSION          = "1.1"
 GITHUB_RAW       = "https://raw.githubusercontent.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/main"
 GITHUB_API       = "https://api.github.com/repos/DodosCraftingCave/Schalteinheit-fuer-Switchbot/contents"
 MDNS_HOST        = "controller-for-switchbot.local"
@@ -529,11 +529,12 @@ class App(tk.Tk):
             font=("Segoe UI",10,"bold"), relief="flat",
             cursor="hand2", pady=8).pack(side="left", fill="x", expand=True, padx=(0,4))
 
-        tk.Button(save_row, text="💾 + ⬆  Speichern & direkt hochladen",
+        self.save_upload_btn = tk.Button(save_row, text="💾 + ⬆  Speichern & direkt hochladen",
             command=self._save_and_upload,
             bg="#1B5E42", fg=GREEN,
             font=("Segoe UI",10,"bold"), relief="flat",
-            cursor="hand2", pady=8).pack(side="left", fill="x", expand=True, padx=(4,0))
+            cursor="hand2", pady=8)
+        self.save_upload_btn.pack(side="left", fill="x", expand=True, padx=(4,0))
 
         tk.Label(self, text=f"Desktop-Pfad: {CONFIG_PATH}",
                  bg=BG, fg=MUTED, font=("Segoe UI",8)).pack(pady=(0,8))
@@ -723,6 +724,11 @@ class App(tk.Tk):
             messagebox.showerror("Fehler",
                 "Keine config.json auf dem Desktop gefunden.\nBitte zuerst speichern.")
             return
+        # Änderung: Beide Upload-Buttons sperren, solange eine Anfrage läuft.
+        # Verhindert überlappende Upload-Requests beim ESP (mehrfaches
+        # schnelles Klicken konnte vorher zu korrupter config.json führen).
+        self.upload_btn.config(state="disabled", text="⏳ Wird hochgeladen…")
+        self.save_upload_btn.config(state="disabled")
         self.status_lbl.config(text="⏳ Lade hoch…")
         self.update()
         threading.Thread(target=self._do_upload, args=(ip, cfg), daemon=True).start()
@@ -736,6 +742,10 @@ class App(tk.Tk):
             err = str(ex)
             self.after(0, lambda: messagebox.showerror("Upload-Fehler", err))
             self.after(0, lambda: self.status_lbl.config(text="❌ Upload fehlgeschlagen."))
+        finally:
+            self.after(0, lambda: self.upload_btn.config(
+                state="normal", text="⬆  Direkt auf ESP laden"))
+            self.after(0, lambda: self.save_upload_btn.config(state="normal"))
 
     # ── Speichern + Hochladen kombiniert ─────────────────────────
     def _save_and_upload(self):
@@ -753,6 +763,8 @@ class App(tk.Tk):
             messagebox.showinfo("Gespeichert",
                 f"config.json gespeichert.\nKein ESP32 gefunden – bitte manuell hochladen.")
             return
+        self.upload_btn.config(state="disabled")
+        self.save_upload_btn.config(state="disabled", text="⏳ Wird hochgeladen…")
         self.status_lbl.config(text="⏳ Speichere & lade hoch…")
         self.update()
         threading.Thread(target=self._do_upload, args=(ip, cfg), daemon=True).start()
