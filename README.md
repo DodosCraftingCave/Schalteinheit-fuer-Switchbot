@@ -10,6 +10,7 @@ Die Einrichtung erledigst du bequem am PC mit dem **SwitchBot Konfigurator**.
 ## Inhalt
 
 - [Was du brauchst](#was-du-brauchst)
+- [Die Taster im Überblick](#die-taster-im-überblick)
 - [1. Konfigurator installieren](#1-konfigurator-installieren)
 - [2. Schalteinheit ins WLAN bringen](#2-schalteinheit-ins-wlan-bringen)
 - [3. SwitchBot-Zugangsdaten besorgen](#3-switchbot-zugangsdaten-besorgen)
@@ -29,6 +30,33 @@ Die Einrichtung erledigst du bequem am PC mit dem **SwitchBot Konfigurator**.
 - ein **SwitchBot-Konto** mit deinen Geräten (SwitchBot-App)
 
 Python oder andere Programme brauchst du **nicht** – alles Nötige steckt im Installer.
+
+---
+
+## Die Taster im Überblick
+
+Die 14 Taster sind in **7 Reihen mit je 2 Tastern** angeordnet, getrennt durch das Beschriftungsfeld in der Mitte.
+**Links** liegen die **ungeraden**, **rechts** die **geraden** Nummern. Taster 1 und 2 sind oben.
+
+```
+┌───────────────────────────────────┐
+│  [  1 ]   Beschriftung    [  2 ]  │
+│                                   │
+│  [  3 ]   Beschriftung    [  4 ]  │
+│                                   │
+│  [  5 ]   Beschriftung    [  6 ]  │
+│                                   │
+│  [  7 ]   Beschriftung    [  8 ]  │
+│                                   │
+│  [  9 ]   Beschriftung    [ 10 ]  │
+│                                   │
+│  [ 11 ]   Beschriftung    [ 12 ]  │
+│                                   │
+│  [ 13 ]   Beschriftung    [ 14 ]  │
+└───────────────────────────────────┘
+```
+
+Die Nummern entsprechen den Zeilen *Taster 1* bis *Taster 14* im Konfigurator.
 
 ---
 
@@ -136,7 +164,7 @@ Um Updates musst du dich nicht kümmern:
 
 ## Werksreset
 
-**Taster 13 und Taster 14 gleichzeitig 5 Sekunden gedrückt halten.**
+**Taster 13 und Taster 14 (unterste Reihe) gleichzeitig 5 Sekunden gedrückt halten.**
 
 Dabei werden die WLAN-Zugangsdaten und die Tasterbelegung gelöscht.
 Anschließend öffnet die Schalteinheit wieder den Hotspot `SwitchBot-Bridge` – weiter geht es mit [Schritt 2](#2-schalteinheit-ins-wlan-bringen).

@@ -149,6 +149,9 @@ Kunden live. Experimente daher auf einem anderen Branch machen.
 
 ## Hardware: Taster-Pin-Zuordnung
 
+Anordnung auf dem Gehäuse: 7 Reihen à 2 Taster, ungerade links, gerade rechts,
+T1/T2 oben (Skizze in der [README](README.md#die-taster-im-überblick)).
+
 | Taster | GPIO | Hinweis |
 |--------|------|---------|
 | T1  | 12 | |
