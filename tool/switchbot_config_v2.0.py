@@ -1361,6 +1361,17 @@ async function applyToolUpdate(btn){
   btn.textContent = 'Aktualisiere…'; btn.disabled = true;
   const res = await api('apply_tool_update', state.toolUpdate.version, state.toolUpdate.sha);
   if (res && !res.ok){
+    if (res.sourceMode){
+      // Self-Update funktioniert nur in der kompilierten Binary (sys.frozen),
+      // nicht im Quellcode-Betrieb — statt Toast+Reset (wirkt wie ein Loop bei
+      // wiederholtem Klicken) den Banner dauerhaft durch einen klaren Hinweis
+      // ersetzen, da ein erneuter Klick hier nie zum Erfolg führen kann.
+      const banner = btn.closest('.banner');
+      if (banner){
+        banner.innerHTML = `<span>Läuft im Quellcode-Modus — Self-Update nicht verfügbar. Bitte die kompilierte Version nutzen oder manuell aktualisieren.</span>`;
+      }
+      return;
+    }
     showToast('error', res.error);
     btn.textContent = 'Jetzt aktualisieren'; btn.disabled = false;
   }
