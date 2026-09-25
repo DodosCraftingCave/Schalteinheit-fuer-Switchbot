@@ -36,7 +36,8 @@ Python oder andere Programme brauchst du **nicht** – alles Nötige steckt im I
 ## Die Taster im Überblick
 
 Die 14 Taster sind in **7 Reihen mit je 2 Tastern** angeordnet, getrennt durch das Beschriftungsfeld in der Mitte.
-**Links** liegen die **ungeraden**, **rechts** die **geraden** Nummern. Taster 1 und 2 sind oben.
+**Links** liegen die **ungeraden**, **rechts** die **geraden** Nummern.
+Halte die Schalteinheit so, dass der **Ladeanschluss unten** ist – dann sind Taster 1 und 2 oben.
 
 ```
 ┌───────────────────────────────────┐
@@ -53,7 +54,10 @@ Die 14 Taster sind in **7 Reihen mit je 2 Tastern** angeordnet, getrennt durch d
 │  [ 11 ]   Beschriftung    [ 12 ]  │
 │                                   │
 │  [ 13 ]   Beschriftung    [ 14 ]  │
-└───────────────────────────────────┘
+│                                   │
+└───────────────[ ▭ ]───────────────┘
+                  ▲
+            Ladeanschluss
 ```
 
 Die Nummern entsprechen den Zeilen *Taster 1* bis *Taster 14* im Konfigurator.
