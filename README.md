@@ -1,117 +1,215 @@
 # Schalteinheit für SwitchBot
 
-ESP32 14-Taster-Matrix Controller für SwitchBot Smart Home Geräte.
+Mit dieser Schalteinheit steuerst du deine **SwitchBot Smart-Home-Geräte über 14 echte Taster** – ganz ohne Handy.
+Jedem Taster kannst du ein Gerät, eine IR-Fernbedienung oder eine Szene samt Befehl zuweisen.
 
-## Für Kunden — Installation
-
-**Windows:**
-1. `tool/install_windows.exe` herunterladen
-2. Doppelklick → installiert sich automatisch, erstellt Desktop-Verknüpfung, startet
-
-**Linux:**
-1. `tool/install_linux` herunterladen
-2. Ausführbar machen: Rechtsklick → Eigenschaften → "Ausführen erlauben"
-   (oder `chmod +x install_linux` im Terminal)
-3. Doppelklick → installiert sich automatisch, erstellt Desktop-Verknüpfung, startet
-
-Kein Python, keine weiteren Programme nötig — alles ist in der Datei enthalten.
-
-**Deinstallation:** `tool/uninstall_windows.exe` bzw. `tool/uninstall_linux` genauso ausführen.
+Die Einrichtung erledigst du bequem am PC mit dem **SwitchBot Konfigurator**.
 
 ---
 
-## Repo-Struktur (öffentlich auf GitHub)
+## Inhalt
+
+- [Was du brauchst](#was-du-brauchst)
+- [Die Taster im Überblick](#die-taster-im-überblick)
+- [1. Konfigurator installieren](#1-konfigurator-installieren)
+- [2. Schalteinheit ins WLAN bringen](#2-schalteinheit-ins-wlan-bringen)
+- [3. SwitchBot-Zugangsdaten besorgen](#3-switchbot-zugangsdaten-besorgen)
+- [4. Taster belegen](#4-taster-belegen)
+- [Updates](#updates)
+- [Werksreset](#werksreset)
+- [Hilfe bei Problemen](#hilfe-bei-problemen)
+- [Deinstallation](#deinstallation)
+
+---
+
+## Was du brauchst
+
+- die Schalteinheit mit Stromversorgung
+- einen PC mit **Windows** oder **Linux**
+- ein **2,4-GHz-WLAN**, in dem sich PC und Schalteinheit befinden
+- ein **SwitchBot-Konto** mit deinen Geräten (SwitchBot-App)
+
+Python oder andere Programme brauchst du **nicht** – alles Nötige steckt im Installer.
+
+---
+
+## Die Taster im Überblick
+
+Die 14 Taster sind in **7 Reihen mit je 2 Tastern** angeordnet, getrennt durch das Beschriftungsfeld in der Mitte.
+**Links** liegen die **ungeraden**, **rechts** die **geraden** Nummern.
+Halte die Schalteinheit so, dass der **Ladeanschluss unten** ist – dann sind Taster 1 und 2 oben.
 
 ```
-Schalteinheit-fuer-Switchbot/
-├── tool/
-│   ├── switchbot_config_v1.1.py     ← Quellcode des Tools
-│   ├── SwitchBot-Konfigurator.exe   ← fertig gebaute App (Windows, automatisch)
-│   ├── SwitchBot-Konfigurator       ← fertig gebaute App (Linux, automatisch)
-│   ├── install.py                   ← Installer-Quellcode
-│   ├── install_windows.exe          ← fertiger Installer (automatisch)
-│   ├── install_linux                ← fertiger Installer (automatisch)
-│   ├── uninstall.py
-│   ├── uninstall_windows.exe        ← (automatisch)
-│   └── uninstall_linux              ← (automatisch)
-├── firmware/
-│   └── firmware_v1.1.bin            ← NUR die kompilierte Binary
-└── .github/workflows/build.yml      ← baut App + Installer automatisch
+┌───────────────────────────────────┐
+│  [  1 ]   Beschriftung    [  2 ]  │
+│                                   │
+│  [  3 ]   Beschriftung    [  4 ]  │
+│                                   │
+│  [  5 ]   Beschriftung    [  6 ]  │
+│                                   │
+│  [  7 ]   Beschriftung    [  8 ]  │
+│                                   │
+│  [  9 ]   Beschriftung    [ 10 ]  │
+│                                   │
+│  [ 11 ]   Beschriftung    [ 12 ]  │
+│                                   │
+│  [ 13 ]   Beschriftung    [ 14 ]  │
+│                                   │
+└───────────────[ ▭ ]───────────────┘
+                  ▲
+            Ladeanschluss
 ```
 
-**Wichtig:** Der ESP32-Firmware-Quellcode (`main.cpp`, `platformio.ini`) bleibt
-**ausschließlich lokal** und wird niemals auf GitHub gepusht — das Projekt ist
-nicht Open Source. Nur die fertig kompilierte `firmware_v1.1.bin` wird
-veröffentlicht, damit das Tool sie herunterladen und per OTA flashen kann.
-Ein `.gitignore` verhindert versehentliches Hinzufügen dieser Dateien.
-
-Dateien mit "automatisch" werden von GitHub Actions bei jedem Push
-auf `tool/switchbot_config_v*.py`, `install.py` oder `uninstall.py`
-neu gebaut und ins Repo committet — nichts davon muss manuell hochgeladen werden.
+Die Nummern entsprechen den Zeilen *Taster 1* bis *Taster 14* im Konfigurator.
 
 ---
 
-## Workflow für neue Tool-Versionen (Entwickler)
+## 1. Konfigurator installieren
 
-1. `switchbot_config_v1.1.py` kopieren → `switchbot_config_v1.2.py`
-2. `VERSION = "1.1"` im neuen File setzen
-3. Alte Versionsdatei aus dem Repo löschen (optional, hält es sauber)
-4. Neue Datei nach `tool/` pushen
-5. GitHub Actions baut automatisch:
-   - `SwitchBot-Konfigurator.exe` / `SwitchBot-Konfigurator` (die App selbst)
-   - `install_windows.exe` / `install_linux` (Installer, lädt nur die App)
-6. Laufende Tools bei Kunden erkennen die neue Version beim Start automatisch
-   und aktualisieren sich selbst (Download der neuen App-Binary, kein
-   Python/pip nötig).
+### Windows
 
-## Workflow für neue ESP32-Firmware (Entwickler)
+1. [**install_windows.exe** herunterladen](tool/install_windows.exe) (auf der Seite rechts oben auf „Download“ klicken)
+2. Datei doppelklicken.
+3. Der Konfigurator wird installiert, bekommt eine Verknüpfung auf dem Desktop und startet automatisch.
 
-1. `main.cpp` (lokal, nicht im Repo) ändern, `FW_VERSION` erhöhen (z.B. `"1.2"`)
-2. PlatformIO lokal: `pio run` → `.pio/build/esp32dev/firmware.bin`
-3. Umbenennen zu `firmware_v1.2.bin` (Muster: `firmware_v*.bin` ist Pflicht,
-   sonst erkennt das Tool die Datei nicht)
-4. Nur diese `.bin`-Datei nach `firmware/` im Repo hochladen (alte Version
-   kann bleiben oder gelöscht werden) — main.cpp/platformio.ini NIEMALS mit hochladen
-5. Tool zeigt bei allen Kunden beim nächsten Start einen Update-Banner an
-   (nur wenn die GitHub-Version wirklich neuer ist als die installierte)
-6. Kunde klickt "Jetzt flashen" im Tool — läuft per WLAN-OTA, ESP32 muss
-   nur im gleichen Netzwerk erreichbar sein, kein USB nötig
+> **Hinweis:** Erscheint die Meldung *„Der Computer wurde durch Windows geschützt“*, klicke auf
+> **Weitere Informationen → Trotzdem ausführen**.
+> Administratorrechte sind nicht nötig.
+
+### Linux
+
+1. [**install_linux** herunterladen](tool/install_linux)
+2. Datei ausführbar machen:
+   Rechtsklick → **Eigenschaften** → **„Als Programm ausführen erlauben“**
+   oder im Terminal:
+   ```bash
+   chmod +x install_linux
+   ```
+3. Datei doppelklicken.
+4. Der Konfigurator wird installiert, bekommt eine Verknüpfung auf dem Desktop und startet automatisch.
 
 ---
 
-## ESP32 mDNS
+## 2. Schalteinheit ins WLAN bringen
 
-Der ESP32 ist im lokalen Netzwerk erreichbar unter:
+Beim ersten Start (oder nach einem [Werksreset](#werksreset)) öffnet die Schalteinheit einen eigenen WLAN-Hotspot:
+
+| | |
+|---|---|
+| **Hotspot-Name** | `SwitchBot-Bridge` |
+
+1. Mit Handy oder PC mit dem WLAN **`SwitchBot-Bridge`** verbinden.
+2. Auf der Einrichtungsseite dein Heim-WLAN auswählen und das Passwort eingeben.
+3. Speichern – die Schalteinheit startet neu und verbindet sich mit deinem WLAN.
+
+Danach ist sie in deinem Netzwerk unter folgender Adresse erreichbar:
+
 ```
 http://controller-for-switchbot.local
 ```
-Das Tool findet den ESP32 automatisch beim Start über diesen Hostnamen.
 
-## Taster-Pin-Zuordnung
+---
 
-| Taster | GPIO | Hinweis |
-|--------|------|---------|
-| T1  | 12 | |
-| T2  | 13 | |
-| T3  | 14 | |
-| T4  | 25 | |
-| T5  | 26 | |
-| T6  | 27 | |
-| T7  | 32 | |
-| T8  | 33 | |
-| T9  | 16 | |
-| T10 | 17 | |
-| T11 | 18 | |
-| T12 | 19 | |
-| T13 | 21 | auch Reset-Pin A |
-| T14 | 22 | auch Reset-Pin B |
+## 3. SwitchBot-Zugangsdaten besorgen
 
-**Werksreset:** T13 + T14 gleichzeitig 5 Sekunden halten
-(löscht WLAN-Zugangsdaten + config.json, ESP32 öffnet danach den
-Einrichtungs-Hotspot `SwitchBot-Bridge`).
+Der Konfigurator braucht **Token** und **Secret** deines SwitchBot-Kontos, um deine Geräte zu laden.
 
-## GitHub Actions Berechtigung
+1. SwitchBot-App öffnen → **Profil** → **Einstellungen**
+2. **10× auf „App-Version“ tippen** – es erscheinen die **Entwickleroptionen**.
+3. Dort findest du **Token** und **Secret (Client Secret)**. Beide kopieren.
 
-Damit der Workflow automatisch committen darf:
-Repo → Settings → Actions → General → Workflow permissions →
-**"Read and write permissions"** muss aktiviert sein.
+> Behandle Token und Secret wie ein Passwort und gib sie nicht weiter.
+
+---
+
+## 4. Taster belegen
+
+1. **SwitchBot Konfigurator** über die Desktop-Verknüpfung starten.
+   Die Schalteinheit wird automatisch im Netzwerk gesucht.
+2. **Token** und **Secret** eintragen.
+3. Auf **🔍 SwitchBot Geräte laden** klicken.
+   Alle Geräte, IR-Fernbedienungen und Szenen deines Kontos erscheinen in der Auswahl.
+4. Für jeden Taster (1–14) ein **Gerät / eine Szene** und den gewünschten **Befehl** wählen
+   (z. B. *Ein*, *Aus*, *Umschalten*, *Szene ausführen*).
+5. Auf **💾 + ⬆ Speichern & direkt hochladen** klicken – fertig!
+
+Zusätzlich wird eine Sicherung als `config.json` auf deinem Desktop abgelegt.
+
+<details>
+<summary><strong>Unterstützte Geräte (Auswahl)</strong></summary>
+
+- **Bot**, **Curtain**, **Blind Tilt**, **Roller Shade**
+- **Smart Locks** (Lock, Lock Pro, Lock Ultra, Lock Lite, Lock Vision …)
+- **Plugs** und **Relay Switches**
+- **Lampen**: Color Bulb, Strip Light, Ceiling Light
+- **Luftbefeuchter**, **Ventilatoren**, **Luftreiniger**
+- **Saugroboter** (K10+, S1, S1 Plus)
+- **IR-Fernbedienungen** aus dem Hub (TV, Klimaanlage, Lautsprecher, DIY …)
+- **Szenen** aus der SwitchBot-App
+
+Nicht aufgeführte Geräte lassen sich in der Regel mit *Ein* / *Aus* schalten.
+
+</details>
+
+---
+
+## Updates
+
+Um Updates musst du dich nicht kümmern:
+
+- **Konfigurator:** Beim Start wird automatisch nach einer neuen Version gesucht. Ein Klick auf **Ja** genügt – der Konfigurator aktualisiert sich selbst.
+- **Schalteinheit:** Gibt es neue Software für die Schalteinheit, erscheint im Konfigurator ein oranges Banner.
+  Klicke auf **🔄 Jetzt flashen** – das Update läuft per WLAN, **kein USB-Kabel nötig**.
+  Die Schalteinheit muss dafür im gleichen Netzwerk wie der PC sein.
+
+> Während eines Updates die Schalteinheit bitte **nicht vom Strom trennen**.
+
+---
+
+## Werksreset
+
+**Taster 13 und Taster 14 (unterste Reihe) gleichzeitig 5 Sekunden gedrückt halten.**
+
+Dabei werden die WLAN-Zugangsdaten und die Tasterbelegung gelöscht.
+Anschließend öffnet die Schalteinheit wieder den Hotspot `SwitchBot-Bridge` – weiter geht es mit [Schritt 2](#2-schalteinheit-ins-wlan-bringen).
+
+---
+
+## Hilfe bei Problemen
+
+<details>
+<summary><strong>Der Konfigurator findet die Schalteinheit nicht</strong></summary>
+
+- Sind PC und Schalteinheit im **gleichen WLAN**?
+- Auf **🔍 Suchen** klicken, um die Suche erneut zu starten.
+- Alternativ die **IP-Adresse** der Schalteinheit manuell eintragen (zu finden z. B. in der Geräteübersicht deines Routers).
+- Hilft nichts: Schalteinheit kurz vom Strom trennen und neu starten.
+
+</details>
+
+<details>
+<summary><strong>„SwitchBot Geräte laden“ schlägt fehl</strong></summary>
+
+- **Token** und **Secret** noch einmal prüfen – keine Leerzeichen am Anfang oder Ende.
+- Besteht eine Internetverbindung?
+
+</details>
+
+<details>
+<summary><strong>Die Schalteinheit verbindet sich nicht mit meinem WLAN</strong></summary>
+
+- Die Schalteinheit unterstützt nur **2,4-GHz-WLAN**.
+- WLAN-Passwort prüfen und die Einrichtung per [Werksreset](#werksreset) wiederholen.
+
+</details>
+
+---
+
+## Deinstallation
+
+| System  | Datei |
+|---------|-------|
+| Windows | [**uninstall_windows.exe**](tool/uninstall_windows.exe) herunterladen und doppelklicken |
+| Linux   | [**uninstall_linux**](tool/uninstall_linux) herunterladen, ausführbar machen (siehe oben) und doppelklicken |
+
+Der Konfigurator und die Desktop-Verknüpfung werden entfernt.
