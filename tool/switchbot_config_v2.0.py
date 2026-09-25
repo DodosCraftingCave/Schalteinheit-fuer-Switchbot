@@ -210,6 +210,35 @@ def esp_set_admin_password(ip, new_password):
         raise Exception(r.text.strip() or f"ESP32 hat das Setzen des Passworts abgelehnt (HTTP {r.status_code}).")
     return r.text
 
+def esp_verify_admin_password(ip, password):
+    """Prüft ein Admin-Passwort gegen das ESP32, OHNE etwas zu verändern:
+    signierter GET /config-Request, nur der HTTP-Status zählt (der Inhalt
+    wird hier nicht ausgewertet — das übernimmt ggf. load_from_esp()
+    separat). Seit main.cpp Änderung #20 hat jedes Gerät ab dem ersten Boot
+    immer schon ein Passwort (Werks-Standard oder selbst gesetzt), daher ist
+    dies jetzt der normale "Verbinden"-Weg statt des früheren Bootstraps:
+    - 200 oder 404 (Gerät frisch, noch keine config.json) → Passwort korrekt.
+    - 403 → Passwort korrekt, aber es ist noch das Werks-Standardpasswort
+      (main.cpp Änderung #20 sperrt dann sensible Endpunkte) — zählt trotzdem
+      als erfolgreich verbunden, nur mit Hinweis statt Fehler.
+    - 401 → Passwort falsch."""
+    headers = esp_auth_headers(ip, password, "GET", "/config")
+    headers["User-Agent"] = "SwitchBot-Tool"
+    req = urllib.request.Request(f"http://{ip}/config", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=8):
+            return {"valid": True, "defaultPass": False}
+    except urllib.error.HTTPError as ex:
+        if ex.code == 404:
+            return {"valid": True, "defaultPass": False}
+        if ex.code == 403:
+            return {"valid": True, "defaultPass": True}
+        if ex.code == 401:
+            return {"valid": False, "error": "Admin-Passwort ist falsch."}
+        if ex.code == 429:
+            return {"valid": False, "error": "ESP32 sperrt wegen zu vieler Fehlversuche kurzzeitig (429) — bitte kurz warten."}
+        return {"valid": False, "error": f"Unerwartete Antwort vom ESP32 (HTTP {ex.code})."}
+
 def esp_change_admin_password(ip, old_password, new_password):
     """Ändert ein BEREITS gesetztes Admin-Passwort. Im Unterschied zu
     esp_set_admin_password() (reiner Bootstrap-Weg, nur für ein frisches
@@ -607,11 +636,16 @@ del "%~f0"
             devices.append(entry)
         cfg = {"api_token": token, "api_secret": secret, "devices": devices}
         try:
+            # Die Desktop-Sicherung enthält BEWUSST kein api_token/api_secret —
+            # das an den ESP32 tatsächlich übertragene cfg (mit Zugangsdaten)
+            # geht ausschließlich in-memory an upload_config() weiter (siehe
+            # transferToEsp() im JS: ruft upload_config(..., saveRes.config)
+            # auf, liest NICHT von dieser Datei). Zugangsdaten landen nur bei
+            # aktivierter "sicher speichern"-Option verschlüsselt in
+            # credentials.enc — nirgends sonst, auch nicht hier auf Verdacht.
+            backup = {"devices": devices}
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=2, ensure_ascii=False)
-            # config.json enthält Token/Secret im Klartext (die ESP32-Firmware
-            # braucht sie so, um selbst gegen die SwitchBot-API zu signieren) —
-            # Dateirechte wenigstens auf den eigenen Benutzer einschränken.
+                json.dump(backup, f, indent=2, ensure_ascii=False)
             try:
                 os.chmod(CONFIG_PATH, 0o600)
             except Exception:
@@ -621,23 +655,45 @@ del "%~f0"
         return {"ok": True, "count": len(devices), "path": CONFIG_PATH, "config": cfg}
 
     # ── Auf ESP hochladen ──
-    def upload_config(self, ip, config=None, admin_password=None):
+    def upload_config(self, ip, config, admin_password=None):
+        """config muss explizit übergeben werden (in-memory, direkt aus
+        save_config()'s Response) — es gibt bewusst KEINEN Fallback mehr, der
+        von CONFIG_PATH liest: die Desktop-Sicherung enthält seit der
+        Sicherheitshärtung kein api_token/api_secret mehr (siehe
+        save_config()), ein Upload von dort würde leere Zugangsdaten an den
+        ESP32 senden."""
         ip = (ip or "").strip()
         if not ip:
             return {"ok": False, "error": "Keine ESP32-IP bekannt. Bitte zuerst verbinden."}
+        if not config:
+            return {"ok": False, "error": "Keine Konfiguration zum Hochladen vorhanden."}
         cfg = config
-        if cfg is None:
-            if not os.path.exists(CONFIG_PATH):
-                return {"ok": False, "error": "Keine config.json auf dem Desktop gefunden."}
-            with open(CONFIG_PATH, encoding="utf-8") as f:
-                cfg = json.load(f)
         try:
             result = esp_upload_config(ip, cfg, admin_password=(admin_password or "").strip() or None)
         except Exception as ex:
             return {"ok": False, "error": str(ex)}
         return {"ok": True, "result": result}
 
-    # ── Admin-Passwort auf einem frischen ESP32 setzen (Bootstrap) ──
+    # ── Admin-Passwort gegen das ESP32 prüfen ("Verbinden") ──
+    def verify_esp_admin_password(self, ip, password):
+        ip = (ip or "").strip()
+        password = (password or "").strip()
+        if not ip:
+            return {"ok": False, "error": "Keine ESP32-IP bekannt. Bitte zuerst verbinden."}
+        if not password:
+            return {"ok": False, "error": "Admin-Passwort eintragen."}
+        try:
+            result = esp_verify_admin_password(ip, password)
+        except Exception as ex:
+            return {"ok": False, "error": str(ex)}
+        if not result["valid"]:
+            return {"ok": False, "error": result.get("error", "Admin-Passwort ist falsch.")}
+        return {"ok": True, "defaultPass": result.get("defaultPass", False)}
+
+    # ── Admin-Passwort auf einem frischen ESP32 setzen (Bootstrap) — seit
+    #    main.cpp Änderung #20 nur noch relevant für Geräte auf sehr alter
+    #    Firmware ohne Werks-Standardpasswort; kein UI-Button mehr dafür,
+    #    Funktion bleibt für diesen Randfall erhalten. ──
     def setup_esp_admin_password(self, ip, new_password):
         ip = (ip or "").strip()
         new_password = (new_password or "").strip()
@@ -680,8 +736,9 @@ del "%~f0"
         liefert dann sauber 401 (kein anderer Recovery-Pfad über die Software:
         sobald main.cpp ein adminPass gespeichert hat, sperrt /config IMMER
         ohne gültige Signatur, unabhängig vom config.json-Zustand. Der einzige
-        echte Recovery-Weg ist ein physischer Werksreset am Gerät, danach neu
-        über setup_esp_admin_password()/'Auf neuem Gerät setzen' bootstrappen)."""
+        echte Recovery-Weg ist ein physischer Werksreset am Gerät — danach hat
+        main.cpp wieder das aus der Chip-ID abgeleitete Werks-Standardpasswort
+        aktiv (main.cpp Änderung #20), auslesbar per Serial-Log)."""
         ip = (ip or "").strip()
         admin_password = (admin_password or "").strip()
         if not ip:
@@ -1070,7 +1127,7 @@ button{font-family:inherit;}
         <label for="inpEspPassword">Admin-Passwort (aktuell / bekannt)</label>
         <input id="inpEspPassword" type="password" autocomplete="off" spellcheck="false">
       </div>
-      <button class="btn secondary" style="width:100%;margin-top:6px;" id="btnSetEspPassword" onclick="setupEspAdminPassword()">Auf neuem Gerät setzen</button>
+      <button class="btn secondary" style="width:100%;margin-top:6px;" id="btnVerifyEspPassword" onclick="verifyEspAdminPassword()">Anmelden</button>
       <div class="field-group" style="margin-top:10px;">
         <label for="inpEspNewPassword">Neues Admin-Passwort (Gerät hat schon eins)</label>
         <input id="inpEspNewPassword" type="password" autocomplete="off" spellcheck="false" placeholder="mind. 8 Zeichen">
@@ -1261,16 +1318,26 @@ async function onRememberToggle(){
   }
 }
 
-async function setupEspAdminPassword(){
+async function verifyEspAdminPassword(){
+  // Seit main.cpp Änderung #20 hat jedes Gerät ab dem ersten Boot immer
+  // schon ein Passwort (Werks-Standard oder selbst gesetzt) — der frühere
+  // unauthentifizierte Bootstrap-Weg ("Auf neuem Gerät setzen") greift
+  // praktisch nicht mehr. Dieser Button prüft stattdessen nur, ob das
+  // eingetragene Passwort stimmt (signierter GET /config, ohne Seiteneffekt).
   if (!state.espIp){ showToast('error', 'Kein ESP32 verbunden. Bitte zuerst verbinden.'); return; }
   const pw = $('inpEspPassword').value;
-  if (pw.length < 8){ showToast('error', 'Admin-Passwort muss mindestens 8 Zeichen haben.'); return; }
-  const btn = $('btnSetEspPassword');
-  btn.disabled = true; btn.textContent = 'Setze…';
-  const res = await api('setup_esp_admin_password', state.espIp, pw);
-  btn.disabled = false; btn.textContent = 'Auf neuem Gerät setzen';
+  if (!pw){ showToast('error', 'Admin-Passwort eintragen.'); return; }
+  const btn = $('btnVerifyEspPassword');
+  btn.disabled = true; btn.textContent = 'Prüfe…';
+  const res = await api('verify_esp_admin_password', state.espIp, pw);
+  btn.disabled = false; btn.textContent = 'Anmelden';
   if (!res.ok){ showToast('error', res.error); return; }
-  showToast('success', 'Admin-Passwort auf dem ESP32 gesetzt.');
+  renderDefaultPasswordBanner(!!res.defaultPass);
+  if (res.defaultPass){
+    showToast('error', 'Passwort korrekt, aber ESP32 läuft noch mit dem Werks-Standardpasswort.');
+  } else {
+    showToast('success', 'Admin-Passwort korrekt — angemeldet.');
+  }
   if ($('chkRemember').checked) api('save_credentials', $('inpToken').value, $('inpSecret').value, pw);
 }
 

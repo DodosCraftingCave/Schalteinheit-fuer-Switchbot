@@ -133,7 +133,8 @@ Der Konfigurator braucht **Token** und **Secret** deines SwitchBot-Kontos, um de
    (z. B. *Ein*, *Aus*, *Umschalten*, *Szene ausführen*).
 5. Auf **💾 + ⬆ Speichern & direkt hochladen** klicken – fertig!
 
-Zusätzlich wird eine Sicherung als `config.json` auf deinem Desktop abgelegt.
+Zusätzlich wird eine Sicherung deiner Taster-Zuordnung als `config.json` auf deinem
+Desktop abgelegt (ohne deine Zugangsdaten — Token/Secret werden dort nie gespeichert).
 
 <details>
 <summary><strong>Unterstützte Geräte (Auswahl)</strong></summary>

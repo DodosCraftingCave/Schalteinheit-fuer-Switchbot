@@ -239,7 +239,13 @@ T1/T2 oben (Skizze in der [README](README.md#die-taster-im-überblick)).
 Windows installiert bewusst nach `%LOCALAPPDATA%` (nicht `Program Files`), damit das
 Auto-Update ohne Admin-Rechte schreiben kann (Fix für *Errno 13*).
 
-Die vom Tool gespeicherte Sicherung liegt unter `~/Desktop/config.json`.
-Zugangsdaten (SwitchBot Token/Secret, ESP32-Admin-Passwort) liegen bei aktivierter
-"sicher speichern"-Option verschlüsselt unter `~/.switchbot_configurator/` (nicht in
-`config.json` — die enthält sie zwangsläufig im Klartext, da die Firmware sie so braucht).
+Die vom Tool gespeicherte Sicherung liegt unter `~/Desktop/config.json` — enthält
+NUR die Taster-Zuordnung (`devices`), bewusst KEIN `api_token`/`api_secret` (Fix nach
+einem gemeldeten Sicherheitsproblem: die Datei wurde vorher bei jedem "Übertragen"
+mit Zugangsdaten im Klartext beschrieben, unabhängig von der "sicher speichern"-
+Option). Die tatsächlich an den ESP32 übertragene Config (mit Zugangsdaten) geht
+ausschließlich in-memory von `save_config()` an `upload_config()` weiter
+(`transferToEsp()` im JS) — `upload_config()` hat dafür bewusst keinen Datei-Fallback
+mehr. Zugangsdaten (SwitchBot Token/Secret, ESP32-Admin-Passwort) liegen NUR bei
+aktivierter "sicher speichern"-Option verschlüsselt unter `~/.switchbot_configurator/`
+— sonst nirgends dauerhaft auf der Platte.
