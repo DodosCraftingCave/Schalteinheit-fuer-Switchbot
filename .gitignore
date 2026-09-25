@@ -26,3 +26,6 @@ build/
 # Betriebssystem
 .DS_Store
 Thumbs.db
+
+# Private Entwickler-Notizen — nur lokal, nie veröffentlichen
+ENTWICKLER.md
