@@ -1,0 +1,19 @@
+# Abhängigkeiten für die lokale Entwicklung von switchbot_config_v2.0.py.
+# Abgeleitet aus .github/workflows/build.yml (dort ist die CI-Fassung, die
+# tatsächlich als App gebaut wird) — bei Änderungen an einer Stelle bitte
+# auch die andere nachziehen.
+pyinstaller
+requests
+pywebview
+cryptography
+
+# Windows nutzt pythonnet, damit pywebview den modernen EdgeChromium/WebView2-
+# Renderer verwendet statt des veralteten mshtml/Trident-Fallbacks.
+pythonnet; sys_platform == "win32"
+
+# Linux/macOS nutzen Qt/QtWebEngine als Renderer (pip-Wheels, kein apt/gi/
+# GTK-Webkit nötig — unter PyInstaller zuverlässiger als der GTK-Backend-Pfad
+# von pywebview).
+PyQt5; sys_platform != "win32"
+PyQtWebEngine; sys_platform != "win32"
+qtpy; sys_platform != "win32"
