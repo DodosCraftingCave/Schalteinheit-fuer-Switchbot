@@ -68,7 +68,7 @@ Die Nummern entsprechen den Zeilen *Taster 1* bis *Taster 14* im Konfigurator.
 
 ### Windows
 
-1. [**install_windows.exe** herunterladen](tool/install_windows.exe) (auf der Seite rechts oben auf „Download“ klicken)
+1. [**install_windows.exe** herunterladen](https://github.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/releases/latest/download/install_windows.exe)
 2. Datei doppelklicken.
 3. Der Konfigurator wird installiert, bekommt eine Verknüpfung auf dem Desktop und startet automatisch.
 
@@ -78,7 +78,7 @@ Die Nummern entsprechen den Zeilen *Taster 1* bis *Taster 14* im Konfigurator.
 
 ### Linux
 
-1. [**install_linux** herunterladen](tool/install_linux)
+1. [**install_linux** herunterladen](https://github.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/releases/latest/download/install_linux)
 2. Datei ausführbar machen:
    Rechtsklick → **Eigenschaften** → **„Als Programm ausführen erlauben“**
    oder im Terminal:
@@ -209,7 +209,7 @@ Anschließend öffnet die Schalteinheit wieder den Hotspot `SwitchBot-Bridge` �
 
 | System  | Datei |
 |---------|-------|
-| Windows | [**uninstall_windows.exe**](tool/uninstall_windows.exe) herunterladen und doppelklicken |
-| Linux   | [**uninstall_linux**](tool/uninstall_linux) herunterladen, ausführbar machen (siehe oben) und doppelklicken |
+| Windows | [**uninstall_windows.exe**](https://github.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/releases/latest/download/uninstall_windows.exe) herunterladen und doppelklicken |
+| Linux   | [**uninstall_linux**](https://github.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/releases/latest/download/uninstall_linux) herunterladen, ausführbar machen (siehe oben) und doppelklicken |
 
 Der Konfigurator und die Desktop-Verknüpfung werden entfernt.

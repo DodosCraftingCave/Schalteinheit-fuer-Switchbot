@@ -17,6 +17,13 @@ from cryptography.fernet import Fernet, InvalidToken
 VERSION          = "2.0"
 GITHUB_RAW       = "https://raw.githubusercontent.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/main"
 GITHUB_API       = "https://api.github.com/repos/DodosCraftingCave/Schalteinheit-fuer-Switchbot/contents"
+# Die App-Binary (Windows/Linux) wird NICHT mehr im Git-Baum gepflegt (die
+# Linux-Variante allein liegt wegen der gebündelten QtWebEngine/Chromium-
+# Engine bei >180MB — deutlich über GitHubs 100MB-Dateilimit fürs Repo) —
+# stattdessen als GitHub-Release-Asset. "releases/latest/download/<name>"
+# ist ein von GitHub bereitgestellter, stabiler Alias, der immer auf den
+# aktuellsten Release zeigt, ohne dass hier ein Tag-Name bekannt sein muss.
+GITHUB_RELEASES  = "https://github.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/releases/latest/download"
 MDNS_HOST        = "controller-for-switchbot.local"
 CONFIG_PATH      = os.path.join(os.path.expanduser("~"), "Desktop", "config.json")
 # Token/Secret werden nicht im Klartext abgelegt, sondern lokal mit einem
@@ -304,11 +311,11 @@ def github_list(path):
         return json.loads(r.read())
 
 def check_tool_update():
-    """Sucht neueste switchbot_config_v*.py auf GitHub. Gibt (neue_version, url, sha)
-    oder (None, None, None) zurück. sha ist der Git-Blob-SHA1 der zugehörigen, bereits
-    kompilierten App-Binary im selben tool/-Ordner (nicht der .py-Quelldatei!) — wird
-    von apply_tool_update() genutzt, um den heruntergeladenen Binary-Download vor der
-    Ausführung zu verifizieren."""
+    """Sucht neueste switchbot_config_v*.py auf GitHub (die Quelldatei ist weiterhin
+    im Git-Baum, nur die kompilierte Binary liegt jetzt als Release-Asset). Gibt
+    (neue_version, url) oder (None, None) zurück. Die Integritätsprüfung der
+    heruntergeladenen Binary läuft in apply_tool_update() über eine mitveröffentlichte
+    .sha256-Begleitdatei, nicht mehr über den Git-Blob-SHA1 dieser Quelldatei-Liste."""
     try:
         files = github_list("tool")
         candidates = []
@@ -318,17 +325,15 @@ def check_tool_update():
                 ver = name.replace("switchbot_config_v","").replace(".py","")
                 candidates.append((parse_version(ver), ver, f["download_url"]))
         if not candidates:
-            return None, None, None
+            return None, None
         candidates.sort(reverse=True)
         best_ver = candidates[0][1]
         best_url = candidates[0][2]
         if parse_version(best_ver) > parse_version(VERSION):
-            app_name = "SwitchBot-Konfigurator.exe" if platform.system() == "Windows" else "SwitchBot-Konfigurator"
-            binary_sha = next((f.get("sha") for f in files if f["name"] == app_name), None)
-            return best_ver, best_url, binary_sha
+            return best_ver, best_url
     except Exception:
         pass
-    return None, None, None
+    return None, None
 
 def check_firmware_update():
     """Sucht neueste firmware_v*.bin im firmware/-Ordner auf GitHub. Gibt
@@ -498,9 +503,9 @@ class Api:
     def check_updates(self):
         result = {"tool": None, "firmware": None}
         try:
-            new_ver, dl_url, bin_sha = check_tool_update()
+            new_ver, dl_url = check_tool_update()
             if new_ver:
-                result["tool"] = {"version": new_ver, "url": dl_url, "sha": bin_sha}
+                result["tool"] = {"version": new_ver, "url": dl_url}
         except Exception:
             pass
         try:
@@ -515,10 +520,11 @@ class Api:
             pass
         return result
 
-    def apply_tool_update(self, new_version, expected_sha=None):
-        """Lädt die fertig gebaute App-Binary von GitHub herunter (gebaut von GitHub
-        Actions) und ersetzt die aktuell laufende Datei. Im Quellcode-Betrieb (nicht
-        als Binary gebaut) gibt es nichts zu ersetzen — dann nur ein Hinweis."""
+    def apply_tool_update(self, new_version):
+        """Lädt die fertig gebaute App-Binary vom neuesten GitHub-Release herunter
+        (gebaut von GitHub Actions, siehe build.yml) und ersetzt die aktuell
+        laufende Datei. Im Quellcode-Betrieb (nicht als Binary gebaut) gibt es
+        nichts zu ersetzen — dann nur ein Hinweis."""
         if not getattr(sys, "frozen", False):
             return {"ok": False, "sourceMode": True,
                     "error": f"Läuft aus dem Quellcode – bitte v{new_version} manuell von GitHub laden."}
@@ -526,7 +532,7 @@ class Api:
             import shutil
             is_windows = platform.system() == "Windows"
             app_name   = "SwitchBot-Konfigurator.exe" if is_windows else "SwitchBot-Konfigurator"
-            url        = f"{GITHUB_RAW}/tool/{app_name}"
+            url        = f"{GITHUB_RELEASES}/{app_name}"
             exe_path   = sys.executable
             tmp_path   = exe_path + ".new"
 
@@ -534,16 +540,23 @@ class Api:
             with urllib.request.urlopen(req, timeout=30) as r, open(tmp_path, "wb") as out:
                 shutil.copyfileobj(r, out)
 
-            # Integritätsprüfung: heruntergeladene Binary muss exakt dem von
-            # GitHub gemeldeten Hash entsprechen, bevor sie die laufende App
-            # ersetzt und ausgeführt wird — verhindert dass eine unterwegs
-            # beschädigte oder manipulierte Datei zur Ausführung kommt.
-            if expected_sha:
+            # Integritätsprüfung: die Binary wird zusammen mit einer .sha256-
+            # Begleitdatei veröffentlicht (siehe build.yml) — heruntergeladene
+            # Datei muss exakt dazu passen, bevor sie die laufende App ersetzt
+            # und ausgeführt wird. Bewusst fail-closed: schlägt die Prüfung
+            # oder schon der Abruf der Prüfsumme fehl, wird NICHT aktualisiert.
+            try:
+                sha_req = urllib.request.Request(f"{url}.sha256", headers={"User-Agent": "SwitchBot-Tool"})
+                with urllib.request.urlopen(sha_req, timeout=15) as r:
+                    expected_sha = r.read().decode("utf-8", errors="replace").strip().split()[0]
                 with open(tmp_path, "rb") as f:
-                    actual_sha = git_blob_sha1(f.read())
+                    actual_sha = hashlib.sha256(f.read()).hexdigest()
                 if actual_sha != expected_sha:
                     os.remove(tmp_path)
                     return {"ok": False, "error": "Update abgebrochen: Integritätsprüfung fehlgeschlagen (Prüfsumme stimmt nicht überein)."}
+            except Exception as ex:
+                os.remove(tmp_path)
+                return {"ok": False, "error": f"Update abgebrochen: Prüfsumme konnte nicht verifiziert werden ({ex})."}
 
             if is_windows:
                 # Windows kann die laufende .exe nicht direkt überschreiben →
@@ -1359,7 +1372,7 @@ async function checkUpdates(){
 
 async function applyToolUpdate(btn){
   btn.textContent = 'Aktualisiere…'; btn.disabled = true;
-  const res = await api('apply_tool_update', state.toolUpdate.version, state.toolUpdate.sha);
+  const res = await api('apply_tool_update', state.toolUpdate.version);
   if (res && !res.ok){
     if (res.sourceMode){
       // Self-Update funktioniert nur in der kompilierten Binary (sys.frozen),

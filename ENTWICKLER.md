@@ -26,23 +26,25 @@ Schalteinheit-fuer-Switchbot/
 ├── ENTWICKLER.md                    ← diese Datei
 ├── tool/
 │   ├── switchbot_config_v2.0.py     ← Quellcode des Konfigurators (pywebview)
-│   ├── SwitchBot-Konfigurator.exe   ← fertige App, Windows   (automatisch gebaut)
-│   ├── SwitchBot-Konfigurator       ← fertige App, Linux     (automatisch gebaut)
 │   ├── install.py                   ← Installer-Quellcode
-│   ├── install_windows.exe          ← fertiger Installer, Windows (automatisch gebaut)
-│   ├── install_linux                ← fertiger Installer, Linux   (automatisch gebaut)
 │   ├── uninstall.py                 ← Deinstaller-Quellcode
-│   ├── uninstall_windows.exe        ← (automatisch gebaut)
-│   ├── uninstall_linux              ← (automatisch gebaut)
 │   └── requirements.txt             ← Abhängigkeiten für lokale Entwicklung
 ├── firmware/
-│   └── firmware_v*.bin              ← NUR die kompilierte Binary
-└── .github/workflows/build.yml      ← baut App + Installer automatisch
+│   └── firmware_v*.bin              ← NUR die kompilierte Binary (weiterhin im Git-Baum)
+└── .github/workflows/build.yml      ← baut App + Installer, veröffentlicht als Release
 ```
 
-> ⚠️ **Ordner- und Dateinamen unter `tool/` und `firmware/` nicht ändern!**
-> Installierte Tools bei Kunden laden Updates über feste Pfade vom `main`-Branch
-> (siehe [Wie das Tool GitHub nutzt](#wie-das-tool-github-nutzt)). Umbenennen bricht Auto-Update und Installer.
+**Wichtig — fertige Binaries liegen NICHT mehr im Git-Baum:** `SwitchBot-Konfigurator(.exe)`,
+`install_windows.exe`/`install_linux`, `uninstall_windows.exe`/`uninstall_linux` werden von
+GitHub Actions gebaut und als **Release-Assets** hochgeladen, nicht mehr committet. Grund:
+die Linux-App-Binary allein liegt wegen der gebündelten QtWebEngine/Chromium-Engine bei
+>180MB — deutlich über GitHubs 100MB-Dateilimit fürs Repo (`libQt5WebEngineCore.so.5` macht
+davon ca. 190MB aus, das lässt sich nicht sinnvoll wegtrimmen, es ist die Chromium-Engine
+selbst). Nur `firmware_v*.bin` bleibt im Git-Baum (die ist klein genug).
+
+> ⚠️ **Dateinamen-Muster `switchbot_config_v*.py` und `firmware_v*.bin` nicht ändern!**
+> Installierte Tools bei Kunden erkennen Updates darüber (siehe
+> [Wie das Tool GitHub nutzt](#wie-das-tool-github-nutzt)). Umbenennen bricht Auto-Update.
 
 **Politik-Historie (falls das wieder aufkommt):** Zwischenzeitlich hatte eine andere
 Session Tool-/Installer-Quellcode und die CI komplett aus dem öffentlichen Repo entfernt
@@ -74,11 +76,14 @@ der HMAC-Signierung hängt am geheimen Admin-Passwort, nicht an geheimem Code
 2. Im neuen File die Version anpassen: `VERSION = "2.1"`
 3. Alte Versionsdatei aus dem Repo löschen (optional, hält es sauber)
 4. Neue Datei nach `tool/` auf `main` pushen
-5. GitHub Actions baut automatisch:
-   - `SwitchBot-Konfigurator.exe` / `SwitchBot-Konfigurator` (die App)
-   - `install_windows.exe` / `install_linux` und `uninstall_windows.exe` / `uninstall_linux`
-6. Laufende Tools bei Kunden erkennen die neue Version beim Start und aktualisieren sich
-   selbst (Download der neuen App-Binary, kein Python/pip nötig).
+5. GitHub Actions baut automatisch und veröffentlicht als **Release** `v2.1`
+   (nicht mehr als Commit ins Repo — siehe [GitHub Actions](#github-actions)):
+   - `SwitchBot-Konfigurator.exe` / `SwitchBot-Konfigurator` (die App) + `.sha256`-Prüfsumme
+   - `install_windows.exe` / `install_linux` und `uninstall_windows.exe` / `uninstall_linux` + `.sha256`
+6. Laufende Tools bei Kunden erkennen die neue Version beim Start (weiterhin über die
+   `switchbot_config_v*.py`-Quelldatei im Repo) und laden die neue Binary von
+   `github.com/.../releases/latest/download/<name>` — verifizieren sie gegen die
+   mitveröffentlichte `.sha256`-Datei, bevor sie sich selbst ersetzen (kein Python/pip nötig).
 
 **Wichtig:**
 - Dateiname muss dem Muster `switchbot_config_v<VERSION>.py` folgen – das Tool liest die
@@ -121,24 +126,35 @@ Workflow: [`.github/workflows/build.yml`](.github/workflows/build.yml)
 
 Außerdem manuell über **Actions → Build App + Installer → Run workflow**.
 
-**Ablauf** (nacheinander, jeder Job committet sein Ergebnis direkt nach `main`):
+**Ablauf** (`prepare-release` läuft zuerst, die vier Build-Jobs hängen nur noch von
+diesem einen Job ab — nicht mehr voneinander — und laufen parallel):
 
 | # | Job | Ergebnis |
 |---|-----|----------|
-| 1 | `build-app-windows` | `tool/SwitchBot-Konfigurator.exe` |
-| 2 | `build-app-linux` | `tool/SwitchBot-Konfigurator` |
-| 3 | `build-installer-windows` | `tool/install_windows.exe`, `tool/uninstall_windows.exe` |
-| 4 | `build-installer-linux` | `tool/install_linux`, `tool/uninstall_linux` |
+| 0 | `prepare-release` | legt Release `v<VERSION>` an (falls noch nicht vorhanden) |
+| 1 | `build-app-windows` | Release-Asset `SwitchBot-Konfigurator.exe` (+ `.sha256`) |
+| 2 | `build-app-linux` | Release-Asset `SwitchBot-Konfigurator` (+ `.sha256`) |
+| 3 | `build-installer-windows` | Release-Assets `install_windows.exe`, `uninstall_windows.exe` (+ `.sha256`) |
+| 4 | `build-installer-linux` | Release-Assets `install_linux`, `uninstall_linux` (+ `.sha256`) |
 
 Gebaut wird mit Python 3.12 und PyInstaller (`--onefile --windowed`). Linux nutzt
 Qt/QtWebEngine (`PyQt5`, `PyQtWebEngine`, `qtpy`) als pywebview-Renderer, Windows nutzt
 `pythonnet` (EdgeChromium/WebView2). Beide Plattformen zusätzlich `cryptography` für die
-lokale Zugangsdaten-Verschlüsselung im Tool. Die Binaries nie manuell hochladen – sie
-werden bei jedem Build überschrieben.
+lokale Zugangsdaten-Verschlüsselung im Tool.
 
-**Einmalige Einstellung**, damit der Workflow committen darf:
+**Warum Releases statt Git-Commit:** Die Linux-App-Binary allein liegt wegen der
+gebündelten QtWebEngine/Chromium-Engine bei >180MB (`libQt5WebEngineCore.so.5` macht davon
+ca. 190MB unkomprimiert aus) — weit über GitHubs 100MB-Dateilimit fürs Repo. `--collect-all
+PyQt5` NICHT verwenden (bläht die Binary durch blindes Kopieren des kompletten
+`PyQt5/Qt5/lib`-Verzeichnisses zusätzlich auf, ohne nennenswerten Nutzen — PyInstallers
+automatische Hooks für `PyQt5.QtWebEngineWidgets` reichen aus). Jeder Build lädt sein
+Ergebnis samt `.sha256`-Prüfsummendatei per `gh release upload ... --clobber` hoch (ersetzt
+ein vorhandenes Asset gleichen Namens). Das Tool und `install.py` verifizieren beim
+Download gegen diese `.sha256`-Datei, bevor die Binary ausgeführt/installiert wird.
+
+**Einmalige Einstellung**, damit der Workflow Releases anlegen/hochladen darf:
 Repo → **Settings → Actions → General → Workflow permissions** →
-**„Read and write permissions"** aktivieren.
+**„Read and write permissions"** aktivieren (dieselbe Einstellung wie vorher fürs Committen).
 
 ---
 
@@ -169,13 +185,14 @@ Basic Auth mehr, das war eine Zwischenstufe):
 | Zweck | Quelle |
 |-------|--------|
 | Tool-Update suchen | GitHub API: Inhalt von `tool/` (sucht `switchbot_config_v*.py`, nur Dateiname zählt) |
-| Tool-Update laden | `raw.githubusercontent.com/.../main/tool/SwitchBot-Konfigurator(.exe)`, gegen Git-Blob-SHA1 verifiziert |
+| Tool-Update laden | `github.com/.../releases/latest/download/SwitchBot-Konfigurator(.exe)`, gegen mitveröffentlichte `.sha256`-Datei verifiziert |
 | Firmware-Update suchen | GitHub API: Inhalt von `firmware/` (sucht `firmware_v*.bin`) |
-| Firmware laden | `download_url` aus der API, gegen Git-Blob-SHA1 verifiziert |
-| Installer | lädt `.../main/tool/SwitchBot-Konfigurator(.exe)` |
+| Firmware laden | `download_url` aus der API, gegen Git-Blob-SHA1 verifiziert (liegt weiterhin im Git-Baum, ist klein genug) |
+| Installer | lädt `github.com/.../releases/latest/download/SwitchBot-Konfigurator(.exe)`, ebenfalls `.sha256`-verifiziert |
 
-Daraus folgt: Alles, was auf `main` in `tool/` und `firmware/` liegt, ist sofort für alle
-Kunden live. Experimente daher auf einem anderen Branch machen.
+Daraus folgt: Alles, was auf `main` in `tool/` und `firmware/` liegt (Quelldatei-Namen,
+Firmware-Binary), sowie jeder neue GitHub-Release ist sofort für alle Kunden live.
+Experimente daher auf einem anderen Branch machen.
 
 **ESP32 im Netzwerk:**
 - mDNS-Hostname: `http://controller-for-switchbot.local` (vom Tool beim Start gesucht)

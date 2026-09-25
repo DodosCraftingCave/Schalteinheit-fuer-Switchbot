@@ -14,6 +14,7 @@ import subprocess
 import threading
 import platform
 import shutil
+import hashlib
 import urllib.request
 
 try:
@@ -24,7 +25,12 @@ except ImportError:
 
 SYSTEM = platform.system()   # "Windows" oder "Linux"
 
-GITHUB_RAW = "https://raw.githubusercontent.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/main"
+# Die App-Binary liegt als GitHub-Release-Asset (nicht mehr im Git-Baum —
+# die Linux-Variante allein ist wegen der gebündelten QtWebEngine/Chromium-
+# Engine >180MB, deutlich über GitHubs 100MB-Dateilimit fürs Repo).
+# "releases/latest/download/<name>" ist ein von GitHub bereitgestellter,
+# stabiler Alias, der immer auf den aktuellsten Release zeigt.
+GITHUB_RELEASES = "https://github.com/DodosCraftingCave/Schalteinheit-fuer-Switchbot/releases/latest/download"
 
 # Änderung: Windows installiert jetzt nach %LOCALAPPDATA% statt
 # %ProgramFiles%. Programme-Ordner braucht Admin-Rechte zum Schreiben —
@@ -44,7 +50,7 @@ else:
     INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".local", "share", "SwitchBot-Konfigurator")
     DESKTOP     = os.path.join(os.path.expanduser("~"), "Desktop")
 
-APP_URL  = f"{GITHUB_RAW}/tool/{APP_NAME}"
+APP_URL  = f"{GITHUB_RELEASES}/{APP_NAME}"
 APP_DEST = os.path.join(INSTALL_DIR, APP_NAME)
 
 
@@ -191,6 +197,26 @@ class InstallerApp(tk.Tk):
             self.after(0, self._log,
                 f"[FEHLER] Heruntergeladene Datei ist zu klein oder ungültig "
                 f"({os.path.getsize(APP_DEST) if os.path.exists(APP_DEST) else 0} Bytes).", "err")
+            return
+
+        # Integritätsprüfung: die Binary wird zusammen mit einer .sha256-
+        # Begleitdatei veröffentlicht (siehe build.yml) — bewusst fail-closed,
+        # bevor eine unterwegs beschädigte/manipulierte Datei installiert wird.
+        try:
+            sha_req = urllib.request.Request(f"{APP_URL}.sha256", headers={"User-Agent": "SwitchBot-Installer"})
+            with urllib.request.urlopen(sha_req, timeout=15) as r:
+                expected_sha = r.read().decode("utf-8", errors="replace").strip().split()[0]
+            with open(APP_DEST, "rb") as f:
+                actual_sha = hashlib.sha256(f.read()).hexdigest()
+            if actual_sha != expected_sha:
+                os.remove(APP_DEST)
+                self.after(0, self._log,
+                    "[FEHLER] Integritätsprüfung fehlgeschlagen — Prüfsumme stimmt nicht überein.", "err")
+                return
+        except Exception as ex:
+            if os.path.exists(APP_DEST):
+                os.remove(APP_DEST)
+            self.after(0, self._log, f"[FEHLER] Prüfsumme konnte nicht verifiziert werden: {ex}", "err")
             return
 
         if SYSTEM == "Linux":
