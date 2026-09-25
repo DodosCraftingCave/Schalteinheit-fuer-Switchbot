@@ -29,3 +29,8 @@ Thumbs.db
 
 # Private Entwickler-Notizen — nur lokal, nie veröffentlichen
 ENTWICKLER.md
+
+# Tool- und Installer-Quellcode bleibt privat
+tool/install.py
+tool/uninstall.py
+.github/workflows/
